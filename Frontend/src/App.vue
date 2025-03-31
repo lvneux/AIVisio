@@ -44,15 +44,46 @@ export default defineComponent({
   setup() {
     const prompt = ref('')
     const imageUrl = ref('')
+    const errorMessage = ref('') // 에러 메시지 저장용
 
-    const generateImage = () => {
-      if (!prompt.value.trim()) return
-      imageUrl.value = `https://via.placeholder.com/512x512.png?text=${encodeURIComponent(prompt.value)}`
+    const generateImage = async () => {
+      console.log("버튼 클릭됨1")
+      if (!prompt.value.trim()) return // 프롬프트가 비어 있으면 요청하지 않음
+      console.log("버튼 클릭됨2")
+
+      try {
+        const response = await fetch('http://localhost:8000/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt.value,
+          }),
+        })
+
+        const data = await response.json()
+        console.log('서버 응답:', data) // 서버 응답 확인
+
+        if (data.status === 'completed' && data.image) {
+          // 이미지 URL이 있는 경우 처리
+          imageUrl.value = `http://127.0.0.1:8000${data.image}`
+          errorMessage.value = '' // 에러 메시지 초기화
+        } else {
+          // 에러 처리
+          console.error(data.message || '이미지 생성 실패')
+          errorMessage.value = data.message || '이미지 생성에 실패했습니다.'
+        }
+      } catch (error) {
+        console.error('요청 실패:', error)
+        errorMessage.value = '이미지 생성 중 오류가 발생했습니다.'
+      }
     }
 
     return {
       prompt,
       imageUrl,
+      errorMessage,
       generateImage,
     }
   },
@@ -140,9 +171,8 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #333;
-  font-size: 14px;
-  padding: 20px;
-  text-align: center;
+}
+
+.editor-placeholder {
 }
 </style>
