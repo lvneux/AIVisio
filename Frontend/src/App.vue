@@ -47,9 +47,7 @@ export default defineComponent({
     const errorMessage = ref('') // 에러 메시지 저장용
 
     const generateImage = async () => {
-      console.log("버튼 클릭됨1")
       if (!prompt.value.trim()) return // 프롬프트가 비어 있으면 요청하지 않음
-      console.log("버튼 클릭됨2")
 
       try {
         const response = await fetch('http://localhost:8000/generate', {
@@ -59,6 +57,7 @@ export default defineComponent({
           },
           body: JSON.stringify({
             prompt: prompt.value,
+            workflow: "base_workflow"
           }),
         })
 

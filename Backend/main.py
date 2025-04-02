@@ -5,6 +5,7 @@ from urllib import request
 from fastapi.responses import StreamingResponse
 import asyncio
 import io
+from pathlib import Path
 
 app = FastAPI()
 
@@ -19,66 +20,16 @@ app.add_middleware(
 
 COMFYUI_IP = "127.0.0.1:8188"  # ComfyUI 서버 IP 및 포트
 
-# 기본 워크플로우 템플릿
-DEFAULT_WORKFLOW = {
-    "3": {
-        "class_type": "KSampler",
-        "inputs": {
-            "seed": 123456789,
-            "steps": 20,
-            "cfg": 7,
-            "sampler_name": "euler",
-            "scheduler": "normal",
-            "denoise": 1,
-            "model": ["4", 0],
-            "positive": ["6", 0],
-            "negative": ["7", 0],
-            "latent_image": ["5", 0]
-        }
-    },
-    "4": {
-        "class_type": "CheckpointLoaderSimple",
-        "inputs": {
-            "ckpt_name": "allInOnePixelModel_v1.ckpt"
-        }
-    },
-    "5": {
-        "class_type": "EmptyLatentImage",
-        "inputs": {
-            "width": 512,
-            "height": 512,
-            "batch_size": 1
-        }
-    },
-    "6": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": "a beautiful sunset over mountains",
-            "clip": ["4", 1]
-        }
-    },
-    "7": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": "ugly, blurry, bad quality",
-            "clip": ["4", 1]
-        }
-    },
-    "8": {
-        "class_type": "VAEDecode",
-        "inputs": {
-            "samples": ["3", 0],
-            "vae": ["4", 2]
-        }
-    },
-    "9": {
-        "class_type": "SaveImage",
-        "inputs": {
-            "images": ["8", 0],
-            "filename_prefix": "ComfyUI"
-        }
-    }
-}
+def load_workflow(file_path: str) -> dict:
+    fp = "./src/" + file_path + ".json"
+    try:
+        with open(fp, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="워크플로우 파일을 찾을 수 없습니다")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="유효하지 않은 JSON 형식입니다")
+    
 
 def modify_workflow(workflow: dict, prompt: str, negative_prompt: str) -> dict:
     """워크플로우의 프롬프트를 수정합니다."""
@@ -143,6 +94,9 @@ async def proxy_image(filename: str):
 @app.post("/generate")
 async def generate(prompt_data: dict):
     try:
+        workflowName = prompt_data.get("workflow", "")
+        workflow = load_workflow(workflowName)
+        
         # 프롬프트 데이터 추출
         prompt = prompt_data.get("prompt", "")
         prompt = prompt + ", pixel"
@@ -152,7 +106,7 @@ async def generate(prompt_data: dict):
         print(f"받은 데이터: {prompt_data}")
 
         # 워크플로우 수정
-        modified_workflow = modify_workflow(DEFAULT_WORKFLOW, prompt, negative_prompt)
+        modified_workflow = modify_workflow(workflow, prompt, negative_prompt)
         print(f"수정된 워크플로우: {json.dumps(modified_workflow, indent=2)}")
         
         # 이미지 생성 요청
