@@ -116,16 +116,17 @@ async def generate(prompt_data: dict):
         result = await check_progress(prompt_id, COMFYUI_IP)
         print(f"결과: {json.dumps(result, indent=2)}")
         
-        final_image_url = None
-        for node_id, node_output in result['outputs'].items():
-            if 'images' in node_output and node_output['images']:
-                for image in node_output['images']:
-                    if image.get('filename'):  # filename이 존재하는 경우만 처리
-                        print(f"생성된 이미지 정보: {image}")
-                        final_image_url = f"/proxy-image/{image['filename']}"
-                        print(f"생성된 이미지 URL: {final_image_url}")
+        last_node_id = max(result['outputs'].keys(), key=int)  
+        last_node_output = result['outputs'][last_node_id]
+
+        if 'images' in last_node_output and last_node_output['images']:
+            last_image = last_node_output['images'][-1]  # 가장 마지막 이미지를 선택
+            if last_image.get('filename'):  
+                final_image_url = f"/proxy-image/{last_image['filename']}"
+                print(f"생성된 이미지 URL: {final_image_url}")
 
         response_data = {"status": "completed", "image": final_image_url} if final_image_url else {"status": "error", "message": "이미지 생성 실패"}
+    
         print(f"응답 데이터: {json.dumps(response_data, indent=2)}")
         return response_data
     except HTTPException as e:
