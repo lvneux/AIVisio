@@ -124,10 +124,7 @@ async def generate(prompt_data: dict):
                         print(f"생성된 이미지 정보: {image}")
                         final_image_url = f"/proxy-image/{image['filename']}"
                         print(f"생성된 이미지 URL: {final_image_url}")
-                        break  # 첫 번째 유효한 이미지만 사용
-                if final_image_url:
-                    break
-                    
+
         response_data = {"status": "completed", "image": final_image_url} if final_image_url else {"status": "error", "message": "이미지 생성 실패"}
         print(f"응답 데이터: {json.dumps(response_data, indent=2)}")
         return response_data
