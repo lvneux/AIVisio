@@ -17,7 +17,7 @@
     "4": {
         "class_type": "CheckpointLoaderSimple",
         "inputs": {
-            "ckpt_name": "allInOnePixelModel_v1.ckpt"
+            "ckpt_name": "dreamshaper_8.safetensors"
         }
     },
     "5": {
@@ -54,6 +54,52 @@
         "inputs": {
             "images": ["8", 0],
             "filename_prefix": "ComfyUI"
+        }
+    },
+    "10": {
+        "class_type": "VAEEncode",
+        "inputs": {
+            "pixels": ["8", 0],
+            "vae": ["4", 2]
+        }
+    },
+    "11": {
+        "class_type": "LoraLoader",
+        "inputs": {
+            "model": ["4", 0],
+            "clip": ["4", 1],
+            "lora_name": "ghibli_style_offset.safetensors",
+            "strength_model": 0.8,
+            "strength_clip": 0.8
+        }
+    },
+    "12": {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": 987654321,
+            "steps": 20,
+            "cfg": 7,
+            "sampler_name": "euler",
+            "scheduler": "normal",
+            "denoise": 0.6,
+            "model": ["11", 0],
+            "positive": ["6", 0],
+            "negative": ["7", 0],
+            "latent_image": ["10", 0]
+        }
+    },
+    "13": {
+        "class_type": "VAEDecode",
+        "inputs": {
+            "samples": ["12", 0],
+            "vae": ["4", 2]
+        }
+    },
+    "14": {
+        "class_type": "SaveImage",
+        "inputs": {
+            "images": ["13", 0],
+            "filename_prefix": "ComfyUI_LoRA"
         }
     }
 }
