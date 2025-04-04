@@ -2,10 +2,10 @@
   <div class="container">
     <!-- 좌측 영역 -->
     <div class="left-panel">
-      <!-- 로고 이미지 -->
+      <!-- 로고 -->
       <img src="@/assets/aivisio_logo.png" alt="AIVISIO Logo" class="logo" />
 
-      <!-- Prompt 입력 영역 -->
+      <!-- Prompt 입력 -->
       <div class="prompt-box">
         <label for="prompt" class="prompt-label">prompt</label>
         <textarea
@@ -14,27 +14,52 @@
           placeholder="이미지 설명을 입력하세요"
         ></textarea>
 
-        <!-- 이미지 버튼 (기능은 그대로) -->
+        <!-- 이미지 생성 버튼 -->
         <img
           src="@/assets/btn_create_image.png"
           alt="Create Image"
           class="create-btn"
-          @click="generateImage"
+          @click="generateImages"
         />
+      </div>
+
+      <!-- 모델 선택 -->
+      <div>선택 모델: {{ selected }}</div>
+      <select v-model="selected">
+        <option disabled value="">다음 중 하나를 선택하세요</option>
+        <option>모델 1</option>
+        <option>모델 2</option>
+        <option>모델 3</option>
+      </select>
+
+      <!-- ✅ 썸네일 리스트 -->
+      <div class="thumbnail-grid">
+        <div
+          v-for="(img, index) in images"
+          :key="index"
+          class="thumbnail"
+          @click="selectImage(img)"
+         :class="{ selected: img === selectedImage }"
+        >
+          <img :src="img" alt="AI 이미지 썸네일" />
+        </div>
       </div>
     </div>
 
-    <!-- 가운데 이미지 출력 영역 -->
+
+
+    <!-- 중앙 미리보기 -->
     <div class="image-viewer">
-      <img v-if="imageUrl" :src="imageUrl" alt="Generated" />
+      <img v-if="selectedImage" :src="selectedImage" alt="선택된 이미지" />
     </div>
 
-    <!-- 우측 편집기 영역 -->
+    <!-- 우측 편집기 -->
     <div class="editor-placeholder">
       편집기능 추가 예정
     </div>
   </div>
 </template>
+
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue'
@@ -43,51 +68,40 @@ export default defineComponent({
   name: 'App',
   setup() {
     const prompt = ref('')
-    const imageUrl = ref('')
-    const errorMessage = ref('') // 에러 메시지 저장용
+    //const imageUrl = ref('')
+    const selected = ref('')
+    const selectedImage = ref('') // ✅ 선택된 썸네일 이미지
+    const images = ref<string[]>([]) // ✅ 썸네일 목록
 
-    const generateImage = async () => {
-      if (!prompt.value.trim()) return // 프롬프트가 비어 있으면 요청하지 않음
+    // ✅ 더미 이미지 배열 (public/assets/ 에 저장해두기)
+    const dummyImages = [
+      '/assets/dummy1.jpg',
+      '/assets/dummy2.jpg',
+      '/assets/dummy3.jpg',
+    ]
 
-      try {
-        const response = await fetch('http://localhost:8000/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: prompt.value,
-            workflow: "base_workflow"
-          }),
-        })
+    const generateImages = () => {
+      if (!prompt.value.trim()) return
+      images.value = dummyImages // 나중에 서버 응답으로 대체
+      selectedImage.value = ''   // 선택 초기화
+    }
 
-        const data = await response.json()
-        console.log('서버 응답:', data) // 서버 응답 확인
-
-        if (data.status === 'completed' && data.image) {
-          // 이미지 URL이 있는 경우 처리
-          imageUrl.value = `http://127.0.0.1:8000${data.image}`
-          errorMessage.value = '' // 에러 메시지 초기화
-        } else {
-          // 에러 처리
-          console.error(data.message || '이미지 생성 실패')
-          errorMessage.value = data.message || '이미지 생성에 실패했습니다.'
-        }
-      } catch (error) {
-        console.error('요청 실패:', error)
-        errorMessage.value = '이미지 생성 중 오류가 발생했습니다.'
-      }
+    const selectImage = (img: string) => {
+      selectedImage.value = img
     }
 
     return {
       prompt,
-      imageUrl,
-      errorMessage,
-      generateImage,
+      selected,
+      selectedImage,
+      images,
+      generateImages,
+      selectImage,
     }
   },
 })
 </script>
+
 
 <style scoped>
 /* 전체 레이아웃 */
@@ -146,6 +160,39 @@ export default defineComponent({
   width: 140px;
   cursor: pointer;
 }
+
+/* 셀렉트 버튼 */
+select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+/* 썸네일 그리드 */
+.thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.thumbnail img {
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  transition: border 0.2s ease;
+}
+
+.thumbnail img:hover {
+  border-color: #ffa500; /* 호버 시 강조 */
+}
+
 
 /* 중앙 이미지 영역 */
 .image-viewer {
