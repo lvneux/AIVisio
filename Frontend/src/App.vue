@@ -19,7 +19,7 @@
           src="@/assets/btn_create_image.png"
           alt="Create Image"
           class="create-btn"
-          @click="generateImages"
+          @click="generateImage"
         />
       </div>
 
@@ -27,8 +27,8 @@
       <div>선택 모델: {{ selected }}</div>
       <select v-model="selected">
         <option disabled value="">다음 중 하나를 선택하세요</option>
-        <option>모델 1</option>
-        <option>모델 2</option>
+        <option>allInOnePixelModel_v1</option>
+        <option>dreamshaper_8</option>
         <option>모델 3</option>
       </select>
 
@@ -45,12 +45,18 @@
         </div>
       </div>
     </div>
-
-
-
+    
+    
     <!-- 중앙 미리보기 -->
+     <!--
     <div class="image-viewer">
       <img v-if="selectedImage" :src="selectedImage" alt="선택된 이미지" />
+    </div>
+    -->
+
+    <!-- 가운데 이미지 출력 영역 -->
+    <div class="image-viewer">
+      <img v-if="imageUrl" :src="imageUrl" alt="Generated" />
     </div>
 
     <!-- 우측 편집기 -->
@@ -72,6 +78,8 @@ export default defineComponent({
     const selected = ref('')
     const selectedImage = ref('') // ✅ 선택된 썸네일 이미지
     const images = ref<string[]>([]) // ✅ 썸네일 목록
+    const imageUrl = ref('')
+    const errorMsg = ref('')
 
     // ✅ 더미 이미지 배열 (public/assets/ 에 저장해두기)
     const dummyImages = [
@@ -79,6 +87,41 @@ export default defineComponent({
       '/assets/dummy2.jpg',
       '/assets/dummy3.jpg',
     ]
+
+    const generateImage = async () => {
+      console.log("버튼 클릭됨1")
+      if (!prompt.value.trim()) return // 프롬프트가 비어 있으면 요청하지 않음
+      console.log("버튼 클릭됨2")
+
+      try {
+        const response = await fetch('http://localhost:8000/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt.value,
+            workflow: selected.value
+          }),
+        })
+
+        const data = await response.json()
+        console.log('서버 응답:', data) // 서버 응답 확인
+
+        if (data.status === 'completed' && data.image) {
+          // 이미지 URL이 있는 경우 처리
+          imageUrl.value = `http://127.0.0.1:8000${data.image}`
+          errorMsg.value = '' // 에러 메시지 초기화
+        } else {
+          // 에러 처리
+          console.error(data.message || '이미지 생성 실패')
+          errorMsg.value = data.message || '이미지 생성에 실패했습니다.'
+        }
+      } catch (error) {
+        console.error('요청 실패:', error)
+        errorMsg.value = '이미지 생성 중 오류가 발생했습니다.'
+      }
+    }
 
     const generateImages = () => {
       if (!prompt.value.trim()) return
@@ -95,7 +138,10 @@ export default defineComponent({
       selected,
       selectedImage,
       images,
+      imageUrl,
+      errorMsg,
       generateImages,
+      generateImage,
       selectImage,
     }
   },
