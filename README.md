@@ -37,8 +37,18 @@
 
 ---
 
-# aivisio_work
+# 실행 방법
 
-## Project setup
-```bash
-npm install
+## 1] ComfyUI 실행
+
+## 2] Backend server 실행
+```
+cd Backend
+uvicorn main:app --reload
+```
+
+## 3] Frontend server 실행
+```
+cd Frontend
+npm run serve
+```
