@@ -29,7 +29,7 @@
         <option disabled value="">다음 중 하나를 선택하세요</option>
         <option>allInOnePixelModel_v1</option>
         <option>dreamshaper_8</option>
-        <option>모델 3</option>
+        <option>LM_model</option>
       </select>
 
       <!-- ✅ 썸네일 리스트 -->

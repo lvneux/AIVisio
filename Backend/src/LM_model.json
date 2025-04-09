@@ -11,7 +11,7 @@
   "2": {
     "inputs": {
       "text": [
-        "12",
+        "9",
         0
       ],
       "clip": [
@@ -27,7 +27,7 @@
   "3": {
     "inputs": {
       "text": [
-        "13",
+        "10",
         0
       ],
       "clip": [
@@ -42,7 +42,7 @@
   },
   "4": {
     "inputs": {
-      "seed": 12321455616123,
+      "seed": 900211929376740,
       "steps": 20,
       "cfg": 7,
       "sampler_name": "dpmpp_2m_sde_gpu",
@@ -110,134 +110,56 @@
       "title": "VAE 디코드"
     }
   },
+  "9": {
+    "inputs": {
+      "text": "A cute cat is lying in front of a house surrounded by nature, taking a nap. pixel style",
+      "random_seed": 1234567890,
+      "model": "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+      "max_tokens": 4096,
+      "apply_instructions": true,
+      "instructions": "Generate a prompt from \"{prompt}\""
+    },
+    "class_type": "Searge_LLM_Node",
+    "_meta": {
+      "title": "Searge LLM Node"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": "realistic. bad quallity.",
+      "random_seed": 1234567890,
+      "model": "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+      "max_tokens": 4096,
+      "apply_instructions": true,
+      "instructions": "Generate a prompt from \"{prompt}\""
+    },
+    "class_type": "Searge_LLM_Node",
+    "_meta": {
+      "title": "Searge LLM Node"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "Searge_Output_Node",
+    "_meta": {
+      "title": "Searge Output Node"
+    }
+  },
   "12": {
     "inputs": {
-      "text": "A cute cat is lying in front of a house surrounded by nature, taking a nap. pixel style.",
-      "random_seed": 1234567890,
-      "model": "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
-      "max_tokens": 4096,
-      "apply_instructions": true,
-      "instructions": "Generate a prompt from \"{prompt}\""
-    },
-    "class_type": "Searge_LLM_Node",
-    "_meta": {
-      "title": "Searge LLM Node"
-    }
-  },
-  "13": {
-    "inputs": {
-      "text": "low quallity, realistic",
-      "random_seed": 1234567890,
-      "model": "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
-      "max_tokens": 4096,
-      "apply_instructions": true,
-      "instructions": "Generate a prompt from \"{prompt}\""
-    },
-    "class_type": "Searge_LLM_Node",
-    "_meta": {
-      "title": "Searge LLM Node"
-    }
-  },
-  "19": {
-    "inputs": {
       "text": [
-        "12",
-        1
-      ],
-      "clip": [
-        "1",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP 텍스트 긍정 조건"
-    }
-  },
-  "20": {
-    "inputs": {
-      "text": [
-        "13",
-        1
-      ],
-      "clip": [
-        "1",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP 텍스트 부정 조건"
-    }
-  },
-  "21": {
-    "inputs": {
-      "seed": 12321455616123,
-      "steps": 20,
-      "cfg": 7,
-      "sampler_name": "dpmpp_2m_sde_gpu",
-      "scheduler": "normal",
-      "denoise": 1,
-      "model": [
-        "1",
-        0
-      ],
-      "positive": [
-        "19",
-        0
-      ],
-      "negative": [
-        "20",
-        0
-      ],
-      "latent_image": [
-        "24",
+        "10",
         0
       ]
     },
-    "class_type": "KSampler",
+    "class_type": "Searge_Output_Node",
     "_meta": {
-      "title": "KSampler1"
-    }
-  },
-  "22": {
-    "inputs": {
-      "samples": [
-        "21",
-        0
-      ],
-      "vae": [
-        "1",
-        2
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE 디코드"
-    }
-  },
-  "23": {
-    "inputs": {
-      "filename_prefix": "ComfyUI",
-      "images": [
-        "22",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "이미지 저장"
-    }
-  },
-  "24": {
-    "inputs": {
-      "width": 512,
-      "height": 512,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "빈 잠재 이미지"
+      "title": "Searge Output Node"
     }
   }
 }
