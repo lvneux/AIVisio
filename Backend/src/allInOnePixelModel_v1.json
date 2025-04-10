@@ -1,59 +1,107 @@
 {
-    "3": {
-        "class_type": "KSampler",
-        "inputs": {
-            "seed": 123456789,
-            "steps": 20,
-            "cfg": 7,
-            "sampler_name": "euler",
-            "scheduler": "normal",
-            "denoise": 1,
-            "model": ["4", 0],
-            "positive": ["6", 0],
-            "negative": ["7", 0],
-            "latent_image": ["5", 0]
-        }
+  "1": {
+    "inputs": {
+      "text": "galaxy",
+      "clip": [
+        "7",
+        1
+      ]
     },
-    "4": {
-        "class_type": "CheckpointLoaderSimple",
-        "inputs": {
-            "ckpt_name": "allInOnePixelModel_v1.ckpt"
-        }
-    },
-    "5": {
-        "class_type": "EmptyLatentImage",
-        "inputs": {
-            "width": 512,
-            "height": 512,
-            "batch_size": 1
-        }
-    },
-    "6": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": "a beautiful sunset over mountains",
-            "clip": ["4", 1]
-        }
-    },
-    "7": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": "ugly, blurry, bad quality",
-            "clip": ["4", 1]
-        }
-    },
-    "8": {
-        "class_type": "VAEDecode",
-        "inputs": {
-            "samples": ["3", 0],
-            "vae": ["4", 2]
-        }
-    },
-    "9": {
-        "class_type": "SaveImage",
-        "inputs": {
-            "images": ["8", 0],
-            "filename_prefix": "ComfyUI"
-        }
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Positive"
     }
+  },
+  "2": {
+    "inputs": {
+      "seed": 414172622156071,
+      "steps": 20,
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m_sde_gpu",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "7",
+        0
+      ],
+      "positive": [
+        "1",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler1"
+    }
+  },
+  "3": {
+    "inputs": {
+      "samples": [
+        "2",
+        0
+      ],
+      "vae": [
+        "7",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE 디코드"
+    }
+  },
+  "4": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "이미지 저장"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "빈 잠재 이미지"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "7",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Negative"
+    }
+  },
+  "7": {
+    "inputs": {
+      "ckpt_name": "allInOnePixelModel_v1.ckpt"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "체크포인트 로드"
+    }
+  }
 }

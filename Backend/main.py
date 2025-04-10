@@ -8,6 +8,7 @@ import io
 from pathlib import Path
 from comfyui_utils import *
 
+# uvicorn main:app --reload
 app = FastAPI()
 
 # CORS 설정
@@ -49,32 +50,32 @@ async def generate(prompt_data: dict):
         workflow = load_workflow(workflowName)
         
         # 프롬프트 데이터 추출
-        prompt = prompt_data.get("prompt", "")
-        prompt = prompt + ", pixel"
-        negative_prompt = ""
-
-        print(f"받은 프롬프트: {prompt}")
-        print(f"받은 데이터: {prompt_data}")
+        positive_prompt = prompt_data.get("prompt", "")
+        negative_prompt = "realistic"
 
         # 워크플로우 수정
-        modified_workflow = modify_workflow(workflow, prompt, negative_prompt)
-        print(f"수정된 워크플로우: {json.dumps(modified_workflow, indent=2)}")
+        modified_workflow = modify_workflow(workflowName, workflow, positive_prompt, negative_prompt)
         
         # 이미지 생성 요청
         prompt_id = queue_prompt(modified_workflow, COMFYUI_IP)
         print(f"생성된 prompt_id: {prompt_id}")
         
         result = await check_progress(prompt_id, COMFYUI_IP)
+        if not result:
+            return {"status": "error", "message": "이미지 생성 실패"}
+            
         print(f"결과: {json.dumps(result, indent=2)}")
         
-        last_node_id = max(result['outputs'].keys(), key=int)  
-        last_node_output = result['outputs'][last_node_id]
-
-        if 'images' in last_node_output and last_node_output['images']:
-            last_image = last_node_output['images'][-1]  # 가장 마지막 이미지를 선택
-            if last_image.get('filename'):  
-                final_image_url = f"/proxy-image/{last_image['filename']}"
-                print(f"생성된 이미지 URL: {final_image_url}")
+        # SaveImage 노드 찾기
+        final_image_url = None
+        for node_id, node_output in result['outputs'].items():
+            if 'images' in node_output:
+                if node_output['images']:
+                    last_image = node_output['images'][-1]
+                    if last_image.get('filename'):
+                        final_image_url = f"/proxy-image/{last_image['filename']}"
+                        print(f"생성된 이미지 URL: {final_image_url}")
+                        break
 
         response_data = {"status": "completed", "image": final_image_url} if final_image_url else {"status": "error", "message": "이미지 생성 실패"}
     

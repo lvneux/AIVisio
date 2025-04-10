@@ -121,7 +121,7 @@
     },
     "class_type": "Searge_LLM_Node",
     "_meta": {
-      "title": "Searge LLM Node"
+      "title": "Positive Searge LLM Node"
     }
   },
   "10": {
@@ -135,7 +135,7 @@
     },
     "class_type": "Searge_LLM_Node",
     "_meta": {
-      "title": "Searge LLM Node"
+      "title": "Negative Searge LLM Node"
     }
   },
   "11": {
