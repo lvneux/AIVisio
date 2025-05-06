@@ -15,45 +15,25 @@ def load_workflow(file_path: str) -> dict:
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="유효하지 않은 JSON 형식입니다")
 
-def modify_workflow(workflowName: str, workflow: dict, positive_prompt: str, negative_prompt: str) -> dict:
+def modify_workflow(workflow: dict, prompt: str, negative_prompt: str) -> dict:
     """워크플로우의 프롬프트를 수정"""
     modified_workflow = workflow.copy()
-
-    if workflowName == "allInOnePixelModel_v1":
-        return modify_allInOnePixelModel_v1(modified_workflow, positive_prompt, negative_prompt)
-    elif workflowName == "LM_model":
-        return modify_LM_model(modified_workflow, positive_prompt, negative_prompt)
-
-
-def modify_LM_model(modified_workflow:dict, positive_prompt: str, negative_prompt: str) -> dict:
-    for node_id, node in modified_workflow.items():
-        if node.get("class_type") == "Searge_LLM_Node":
-            node['inputs']["random_seed"] = random.randint(0, 1000000)
-
-            if "positive" in node["_meta"].get("title", "").lower():
-                node["inputs"]["text"] = positive_prompt
-            elif "negative" in node["_meta"].get("title", "").lower():
-                node["inputs"]["text"] = negative_prompt
-
-    return modified_workflow
-
-def modify_allInOnePixelModel_v1(modified_workflow:dict, positive_prompt: str, negative_prompt:str) -> dict:
+    modified_workflow['3']['inputs']["seed"] = random.randint(0, 1000000)
+    
     # 프롬프트 수정
     for node_id, node in modified_workflow.items():
-        if node.get("class_type") == "KSampler":
-            node['inputs']["seed"] = random.randint(0, 1000000)
 
         if node.get("class_type") == "CLIPTextEncode":
             if "text" in node["inputs"]:
-                if "positive" in node["_meta"].get("title", "").lower():
-                    node["inputs"]["text"] = positive_prompt
-                elif "negative" in node["_meta"].get("title", "").lower():
+                if "negative" in node["inputs"].get("text", "").lower():
                     node["inputs"]["text"] = negative_prompt
+                else:
+                    node["inputs"]["text"] = prompt
     
     return modified_workflow
 
-
-def queue_prompt(prompt_workflow, ip):
+def queue_prompt(prompt_workflow: dict, ip: str) -> str:
+    """ComfyUI에 프롬프트를 큐에 추가"""
     p = {"prompt": prompt_workflow}
     data = json.dumps(p).encode('utf-8')
     req = request.Request(f"http://{ip}/prompt", data=data)
