@@ -1,0 +1,20 @@
+t,Top1,Top2,Top3,H_t (nat),¥ÄH_t
+1,Pixel 0.03,Visual cortex 0.03,Brain 0.01,1.4296,
+2,Neural network 0.03,Machine learning 0.02,Buzzword 0.01,1.5215,0.0919
+3,Neural network 0.03,Neuron 0.02,Vanilla 0.02,1.5766,0.0552
+4,Neuron 0.06,,,0,1.5766
+5,Neuron 0.04,,,0,0
+6,Neuron 0.04,Pixel 0.02,Mathematics 0.01,1.2538,1.2538
+7,Neuron 0.04,,,0,1.2538
+8,Neuron 0.05,,,0,0
+9,Pixel 0.02,Computer vision 0.02,Abstraction 0.01,1.5021,1.5021
+10,Pixel 0.05,Neuron 0.02,,0.8812,0.6209
+11,Sigmoid function 0.03,Logistic function 0.02,Pixel 0.02,1.5643,0.6831
+12,Neuron 0.05,Weight function 0.02,Pixel 0.01,1.3759,0.1884
+13,Thought experiment 0.05,,,0,1.3759
+14,Neural network 0.02,Matrix (mathematics) 0.01,Neuron 0.01,1.5338,1.5338
+15,Linear algebra 0.02,Sigmoid function 0.02,Cross product 0.01,1.5608,0.027
+16,Neuron 0.03,Matrix multiplication 0.02,Function (mathematics) 0.01,1.4048,0.156
+17,YouTube 0.03,Patreon 0.03,Neural network 0.01,1.4729,0.0681
+18,Rectifier (neural networks) 0.04,Sigmoid function 0.02,Neuron 0.01,1.4435,0.0294
+19,Identity function 0.03,Rectifier (neural networks) 0.03,Deep learning 0.02,1.5741,0.1306
