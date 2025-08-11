@@ -127,6 +127,8 @@ def process_youtube_segments_with_wikifier(json_path: str, user_key: str):
     
     sorted_blocks = [block_map[i] for i in sorted(block_map.keys())]
 
+
+    # 여기까지 분석 완료
     # Wikifier 호출 (1초 딜레이로 API 과부하 방지)
     all_topics = []
     for i, block in enumerate(sorted_blocks):

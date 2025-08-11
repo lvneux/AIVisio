@@ -1,0 +1,74 @@
+"""
+YouTube 영상 분석 메인 스크립트
+모듈화된 구조를 사용하여 깔끔하게 정리된 버전
+"""
+
+from transcript import extract_transcript
+from youtube_api import get_youtube_chapters
+from segments import segment_video_by_description, map_subtitles_to_segments
+from file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
+
+
+def main():
+    """메인 실행 함수"""
+    video_id = 'E6DuimPZDz8'  # 테스트용 영상 ID
+    
+    
+    # 언어 선택 변수
+    lang = 'ko'  # 'en' 또는 'ko'로 변경
+    
+    print("=" * 60)
+    print("🎬 YouTube 영상 분석 시작")
+    print("=" * 60)
+    
+    
+    # 자막 추출
+    print(f"\n🌐 선택된 언어: {'한국어' if lang == 'ko' else '영어'}")
+    transcript_data = extract_transcript(video_id, lang=lang)
+    
+    if transcript_data:
+        print(f"\n📊 추출된 자막 구간 수: {len(transcript_data)}")
+        print("📝 첫 번째 자막 구간 예시:")
+        if transcript_data:
+            first_segment = transcript_data[0]
+            print(f"   시간: {first_segment.start:.2f}s - {first_segment.start + first_segment.duration:.2f}s")
+            print(f"   내용: {first_segment.text[:100]}...")
+    
+    # 세그먼트 추출 (실제 YouTube 챕터 사용)
+    print(f"\n" + "=" * 60)
+    print("📋 YouTube 챕터 기반 세그먼트 추출")
+    print("=" * 60)
+
+    # 실제 YouTube 챕터 정보 가져오기
+    segments = get_youtube_chapters(video_id)
+    
+    # YouTube API를 사용할 수 없는 경우 예시 설명 사용
+    if not segments:
+        print("⚠️ YouTube API를 사용할 수 없습니다.")
+        print("   환경변수 YOUTUBE_API_KEY를 설정해주세요.")
+        return
+    
+    if segments:
+
+        # 자막 매핑
+        if transcript_data:
+            segments = map_subtitles_to_segments(segments, transcript_data)
+        
+        # 세그먼트 정보 저장
+        save_segments_to_json(segments, video_id)
+        save_segments_to_txt(segments, video_id)
+        save_segments_with_subtitles_to_json(segments, video_id)
+        
+        print(f"\n📈 세그먼트 분석 결과:")
+        print(f"   - 총 세그먼트 수: {len(segments)}개")
+        if segments:
+            avg_duration = sum(seg.end_time - seg.start_time for seg in segments) / len(segments)
+            print(f"   - 평균 세그먼트 길이: {avg_duration:.1f}초")
+    else:
+        print("⚠️ 세그먼트를 추출할 수 없습니다.")
+    
+    print(f"\n✅ 분석 완료!")
+
+
+if __name__ == "__main__":
+    main() 
