@@ -1,0 +1,81 @@
+# 환경변수 파일 (API 키 등 민감한 정보)
+.env
+.env.local
+.env.*.local
+
+# Python 가상환경
+.venv/
+venv/
+env/
+ENV/
+
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python 배포 파일
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# IDE 설정 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 생성 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 로그 파일
+*.log
+
+# 임시 파일
+*.tmp
+*.temp
+
+# 데이터베이스 파일
+*.db
+*.sqlite3
+
+# 백업 파일
+*.bak
+*.backup
+
+# 프로젝트 특정 파일
+output/
+*.csv
+*.json
+*.txt
