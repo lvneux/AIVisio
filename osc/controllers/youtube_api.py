@@ -6,12 +6,22 @@ import os
 import re
 import requests
 from typing import List, Optional
-from dotenv import load_dotenv
-from models import VideoSegment
-from utils import time_str_to_seconds, seconds_to_time_str
+from models.video_segment import VideoSegment
+from controllers.utils import time_str_to_seconds, seconds_to_time_str
 
 # .env 파일 로드
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # 루트 폴더(AIVisio)에서 .env 파일 찾기
+    import os
+    current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_path = os.path.join(current_dir, '.env')
+    load_dotenv(env_path)
+    print(f"✅ .env 파일 로드 완료: {env_path}")
+except ImportError:
+    print("⚠️ python-dotenv가 설치되지 않음, 환경변수 직접 사용")
+except Exception as e:
+    print(f"⚠️ .env 파일 로드 실패: {e}")
 
 
 def get_youtube_video_info(video_id: str) -> Optional[dict]:
@@ -28,12 +38,12 @@ def get_youtube_video_info(video_id: str) -> Optional[dict]:
         # YouTube Data API v3 엔드포인트
         url = f"https://www.googleapis.com/youtube/v3/videos"
         
-        # API 키는 환경변수에서 가져오거나 직접 설정
-        api_key = os.getenv('YOUTUBE_API_KEY', '')  # 환경변수에서 가져오기
+        # API 키는 환경변수에서 가져오기
+        api_key = os.getenv('YOUTUBE_API_KEY', '')
         
         if not api_key:
             print("⚠️ YouTube API 키가 설정되지 않았습니다.")
-            print("   환경변수 YOUTUBE_API_KEY를 설정하거나 직접 입력해주세요.")
+            print("   .env 파일에 YOUTUBE_API_KEY를 설정해주세요.")
             return None
         
         params = {

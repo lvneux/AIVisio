@@ -6,12 +6,14 @@ import json
 import os
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-from utils import seconds_to_time_str
+from controllers.utils import seconds_to_time_str
 
 
 def ensure_output_dir():
     """output 폴더가 존재하는지 확인하고 없으면 생성합니다."""
-    output_dir = './output'
+    # osc 폴더를 기준으로 한 절대 경로 사용
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(current_dir, 'output')
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
@@ -32,17 +34,24 @@ def extract_transcript(video_id, lang='en'):
         print(f"🌐 선택 언어: {'한국어' if lang == 'ko' else '영어'}")
         print("🔍 자막을 가져오는 중...")
         
-        # YouTubeTranscriptApi 인스턴스 생성
-        ytt_api = YouTubeTranscriptApi()
-        
-        # 선택한 언어로 자막 가져오기
+        # YouTubeTranscriptApi를 사용하여 자막 가져오기
         try:
+            # 올바른 방법: 인스턴스 생성 후 fetch 사용
+            ytt_api = YouTubeTranscriptApi()
             transcript_data = ytt_api.fetch(video_id, languages=[lang])
             lang_name = "한국어" if lang == 'ko' else "영어"
             print(f"✅ {lang_name} 자막을 성공적으로 가져왔습니다.")
         except Exception as e:
             print(f"❌ {lang} 자막을 가져올 수 없습니다: {e}")
-            return None
+            # 대안: 영어 자막 시도
+            try:
+                print("🔄 영어 자막으로 재시도...")
+                ytt_api = YouTubeTranscriptApi()
+                transcript_data = ytt_api.fetch(video_id, languages=['en'])
+                print("✅ 영어 자막을 성공적으로 가져왔습니다.")
+            except Exception as e2:
+                print(f"❌ 영어 자막도 실패: {e2}")
+                return None
         
         print(f"📊 추출된 자막 구간 수: {len(transcript_data)}")
         

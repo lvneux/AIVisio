@@ -3,16 +3,15 @@ YouTube 영상 분석 메인 스크립트
 모듈화된 구조를 사용하여 깔끔하게 정리된 버전
 """
 
-from transcript import extract_transcript
-from youtube_api import get_youtube_chapters
-from segments import segment_video_by_description, map_subtitles_to_segments
-from file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
-
+from controllers.transcript import extract_transcript
+from controllers.youtube_api import get_youtube_chapters
+from controllers.segments import segment_video_by_description, map_subtitles_to_segments
+from controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
+from controllers.summary import generate_summary
 
 def main():
     """메인 실행 함수"""
     video_id = 'E6DuimPZDz8'  # 테스트용 영상 ID
-    
     
     # 언어 선택 변수
     lang = 'ko'  # 'en' 또는 'ko'로 변경
@@ -20,7 +19,6 @@ def main():
     print("=" * 60)
     print("🎬 YouTube 영상 분석 시작")
     print("=" * 60)
-    
     
     # 자막 추출
     print(f"\n🌐 선택된 언어: {'한국어' if lang == 'ko' else '영어'}")
@@ -33,6 +31,9 @@ def main():
             first_segment = transcript_data[0]
             print(f"   시간: {first_segment.start:.2f}s - {first_segment.start + first_segment.duration:.2f}s")
             print(f"   내용: {first_segment.text[:100]}...")
+    else :
+        print("❌ 자막을 추출할 수 없습니다.")
+        return
     
     # 세그먼트 추출 (실제 YouTube 챕터 사용)
     print(f"\n" + "=" * 60)
@@ -49,7 +50,6 @@ def main():
         return
     
     if segments:
-
         # 자막 매핑
         if transcript_data:
             segments = map_subtitles_to_segments(segments, transcript_data)
@@ -57,7 +57,7 @@ def main():
         # 세그먼트 정보 저장
         save_segments_to_json(segments, video_id)
         save_segments_to_txt(segments, video_id)
-        save_segments_with_subtitles_to_json(segments, video_id)
+        save_segments_with_subtitles_to_json(segments, video_id, language_code=lang)
         
         print(f"\n📈 세그먼트 분석 결과:")
         print(f"   - 총 세그먼트 수: {len(segments)}개")
