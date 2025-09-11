@@ -40,7 +40,10 @@ def get_youtube_video_info(video_id: str) -> Optional[dict]:
         
         # API 키는 환경변수에서 가져오기
         api_key = os.getenv('YOUTUBE_API_KEY', '')
-        
+
+        if api_key == None:
+            api_key = "AIzaSyAOwWaR6XuNF3w5YxFDSYZrPFyrEqw81UE"
+
         if not api_key:
             print("⚠️ YouTube API 키가 설정되지 않았습니다.")
             print("   .env 파일에 YOUTUBE_API_KEY를 설정해주세요.")

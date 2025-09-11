@@ -12,6 +12,7 @@ except ImportError:
 
 
 def generate_summary(text: str, language_code: str = 'ko') -> str:
+    import torch
     """
     주어진 텍스트를 AI 모델을 사용하여 요약합니다.
     

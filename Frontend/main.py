@@ -1,10 +1,66 @@
 import streamlit as st
 from streamlit_player import st_player
 from datetime import datetime
+from pathlib import Path
+import json
 
 st.set_page_config(page_title="AIVisio", layout="wide")
 
-# 사용자 정의 스타일
+# -------------------- JSON 로딩 유틸 --------------------
+@st.cache_data(show_spinner=False)
+def load_segments():
+    """
+    root/Frontend/main.py 기준으로 프로젝트 루트(root) 경로를 계산하고
+    root/osc/output/E6DuimPZDz8_segments_with_subtitles.json 파일을 읽어
+    (title, summary) 항목 목록을 반환합니다.
+    """
+    try:
+        # 현재 파일 기준으로 프로젝트 루트 계산: .../root/Frontend/main.py -> root
+        root_dir = Path(__file__).resolve().parents[1]
+        json_path = root_dir / "osc" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 데이터가 list 형태 또는 dict 내부 리스트일 수 있어 최대한 유연하게 파싱
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            # 흔히 쓰는 키들 후보
+            for key in ["segments", "data", "items", "results"]:
+                if key in data and isinstance(data[key], list):
+                    items = data[key]
+                    break
+            else:
+                # dict인데 리스트가 없으면 빈 리스트로 처리
+                items = []
+        else:
+            items = []
+
+        # (title, summary)만 추출
+        cleaned = []
+        for it in items:
+            title = it.get("title")
+            summary = it.get("summary")
+            if title is not None:
+                cleaned.append({"title": str(title), "summary": summary if summary is not None else ""})
+        return cleaned, None
+    except FileNotFoundError as e:
+        return [], f"파일을 찾을 수 없습니다: {e}"
+    except Exception as e:
+        return [], f"JSON 파싱 중 오류가 발생했습니다: {e}"
+
+def unique_preserve_order(seq):
+    """순서를 보존하면서 중복 제거"""
+    seen = set()
+    out = []
+    for x in seq:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+# -------------------- 사용자 정의 스타일 --------------------
 st.markdown("""
     <style>
     /* 로고 박스 위치 조정 */
@@ -49,6 +105,24 @@ st.markdown("""
     label[for="memo"] > div:first-child {
         display: none;
     }
+
+    /* 좌측 챕터 버튼 스타일 */
+    .chapter-btn {
+        width: 100%;
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        cursor: pointer;
+    }
+    .chapter-btn:hover {
+        background: #f9fafb;
+    }
+    .chapter-btn.active {
+        background: #e0f2fe;
+        border-color: #93c5fd;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -57,6 +131,14 @@ st.markdown('<div class="logo-box"><div class="logo-text">AIVisio</div></div>', 
 
 # 공간 확보용 빈 줄
 st.markdown("<br><br><br>", unsafe_allow_html=True)
+
+# 세션 상태 초기화
+if "selected_title" not in st.session_state:
+    st.session_state.selected_title = None
+
+# JSON 로드
+segments, load_err = load_segments()
+titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
 
 # 레이아웃 정의
 col1, col2, col3 = st.columns([1.5, 3.5, 2])
@@ -67,13 +149,60 @@ with col1:
     subject = st.selectbox("공부할 주제를 선택하세요", ["Python", "Neural Networks", "C++"], label_visibility="collapsed")
 
     st.markdown('<div class="section-title" style="margin-top: 20px;">▶ 챕터 목록</div>', unsafe_allow_html=True)
-    for i in range(1, 6):
-        st.markdown(f'<div class="chapter-box">📌 챕터 {i} - 구현 예정</div>', unsafe_allow_html=True)
+
+    if load_err:
+        st.error(load_err)
+        st.info("파일 경로를 확인해주세요: root/osc/output/E6DuimPZDz8_segments_with_subtitles.json")
+    elif not titles:
+        st.warning("표시할 챕터가 없습니다. JSON에 title 항목이 있는지 확인해주세요.")
+    else:
+        # 클릭형 챕터 목록
+        for i, t in enumerate(titles):
+            # 버튼 대신 HTML + st.button 조합으로 활성효과 부여
+            # 버튼의 키는 고유해야 하므로 index 포함
+            active = (st.session_state.selected_title == t)
+            btn_label = f"📌 {t}"
+            # 시각적 active 효과를 위해 container 사용
+            c = st.container()
+            with c:
+                # 버튼
+                clicked = st.button(btn_label, key=f"chapter_btn_{i}", use_container_width=True)
+                # 클릭 시 선택 저장
+                if clicked:
+                    st.session_state.selected_title = t
+            # 버튼 아래에 얇은 구분선
+            st.markdown("<hr style='margin:6px 0; border: none; border-top: 1px solid #eee;'/>", unsafe_allow_html=True)
+
+        # 현재 선택된 챕터 표시
+        if st.session_state.selected_title:
+            st.info(f"선택된 챕터: **{st.session_state.selected_title}**")
 
 # -------------------- 가운데 영역 --------------------
 with col2:
     st.markdown('<div class="section-title">추천 교육 영상</div>', unsafe_allow_html=True)
-    st_player("https://youtu.be/aircAruvnKk?si=36OqaTVVxkmms_q3")
+    st_player("https://youtu.be/E6DuimPZDz8")
+
+    # 선택된 챕터 요약 출력 섹션
+    st.markdown("---")
+    st.markdown('<div class="section-title">선택한 챕터 요약</div>', unsafe_allow_html=True)
+
+    if load_err:
+        st.stop()  # 이미 좌측에서 에러 안내
+    if st.session_state.selected_title:
+        # 선택된 title에 해당하는 모든 summary 모아 출력
+        matched = [it for it in segments if it.get("title") == st.session_state.selected_title]
+        summaries = [it.get("summary", "") for it in matched if it.get("summary")]
+        if summaries:
+            st.success(f"총 {len(summaries)}개의 요약을 표시합니다.")
+            # 각 summary를 expander로 보기 좋게 출력
+            for idx, s in enumerate(summaries, start=1):
+                with st.expander(f"요약 {idx}", expanded=(len(summaries) == 1)):
+                    # 줄바꿈을 유지해서 표시
+                    st.markdown(s.replace("\n", "  \n"))
+        else:
+            st.warning("해당 챕터에 연결된 summary가 없습니다.")
+    else:
+        st.info("좌측에서 챕터를 선택하면 이 영역에 summary가 표시됩니다.")
 
     st.markdown("---")
     st.markdown('<div class="section-title">주요 개념 학습</div>', unsafe_allow_html=True)
@@ -87,7 +216,7 @@ with col2:
     for concept in key_concepts:
         col_concept, col_button = st.columns([4, 1])
         col_concept.markdown(f"- {concept}", unsafe_allow_html=True)
-        if col_button.button("관련 문제 풀기", key=concept):
+        if col_button.button("관련 문제 풀기", key=f"concept_{concept}"):
             st.warning(f"🔁 '{concept}'에 대한 문제풀이 페이지로 이동 예정입니다 (구현 예정).")
 
 # -------------------- 우측 영역 --------------------
@@ -114,6 +243,8 @@ with col3:
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.set_font("Arial", size=12)
+                # PDF는 줄 길이 제한이 있으므로 multi_cell 사용이 안전하지만,
+                # 의존성 최소화를 위해 간단히 cell로 나눠 출력
                 for line in memo_text.split("\n"):
                     pdf.cell(200, 10, txt=line, ln=True)
                 filepath = f"{filename}.pdf"
