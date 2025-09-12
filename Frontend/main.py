@@ -22,6 +22,8 @@ def load_segments():
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        items =[]
+
         # 데이터가 list 형태 또는 dict 내부 리스트일 수 있어 최대한 유연하게 파싱
         if isinstance(data, list):
             items = data
@@ -37,14 +39,42 @@ def load_segments():
         else:
             items = []
 
+        def parse_timecode(ts: str):
+            if ts is None:
+                return None
+            ts = str(ts).strip()
+            # 허용 형식: "HH:MM:SS", "MM:SS", "SS"
+            try:
+                parts = [int(p) for p in ts.split(":")]
+                sec = 0
+                for p in parts:
+                    sec = sec * 60 + p
+                return sec
+            except Exception:
+                return None
+
         # (title, summary)만 추출
         cleaned = []
         for it in items:
             title = it.get("title")
             summary = it.get("summary")
+
+            s_raw = it.get("start_time_formatted") 
+            e_raw = it.get("end_time_formatted")
+
+            s_sec = parse_timecode(s_raw)
+            e_sec = parse_timecode(e_raw)
+
             if title is not None:
-                cleaned.append({"title": str(title), "summary": summary if summary is not None else ""})
+                cleaned.append({
+                    "title": str(title),
+                    "summary": summary,
+                    "start_sec": s_sec,
+                    "end_sec": e_sec
+                })
+
         return cleaned, None
+    
     except FileNotFoundError as e:
         return [], f"파일을 찾을 수 없습니다: {e}"
     except Exception as e:
@@ -180,12 +210,42 @@ with col1:
 # -------------------- 가운데 영역 --------------------
 with col2:
     st.markdown('<div class="section-title">추천 교육 영상</div>', unsafe_allow_html=True)
-    st_player("https://youtu.be/E6DuimPZDz8")
+    
+    YT_WATCH_URL = "https://www.youtube.com/watch?v=E6DuimPZDz8"
+    YT_EMBED_BASE = "https://www.youtube.com/embed/E6DuimPZDz8"
+
+    # 선택된 챕터가 있고, 구간정보가 있으면 그 구간만 재생
+    seg_to_play = None
+    if st.session_state.selected_title:
+        # 같은 타이틀이 여러개면 첫 구간을 기본으로 사용
+        candidates = [it for it in segments if it.get("title") == st.session_state.selected_title]
+        for c in candidates:
+            if c.get("start_sec") is not None and c.get("end_sec") is not None:
+                seg_to_play = c
+                break
+
+    if seg_to_play:
+        # 1차: Streamlit 내장 플레이어 (YouTube URL + start_time/end_time)
+        try:
+            st.video(
+                YT_WATCH_URL,
+                start_time=int(seg_to_play["start_sec"]),
+                end_time=int(seg_to_play["end_sec"]),
+                autoplay=False,
+                muted=False,
+            )
+        except Exception:
+            # 2차: 임베드 URL 우회 (start/end 쿼리) — 일부 환경 호환용
+            # 유튜브가 end 파라미터를 무시하는 경우도 있어요. 그땐 아래 iframe을 사용하세요.
+            from streamlit import components
+            embed_url = f"{YT_EMBED_BASE}?start={int(seg_to_play['start_sec'])}&end={int(seg_to_play['end_sec'])}&rel=0&modestbranding=1"
+            components.v1.iframe(embed_url, height=360, scrolling=False)
+    else:
+        # 기본: 전체 영상
+        st_player(YT_WATCH_URL)
 
     # 선택된 챕터 요약 출력 섹션
     st.markdown("---")
-    st.markdown('<div class="section-title">선택한 챕터 요약</div>', unsafe_allow_html=True)
-
     if load_err:
         st.stop()  # 이미 좌측에서 에러 안내
     if st.session_state.selected_title:
@@ -193,10 +253,9 @@ with col2:
         matched = [it for it in segments if it.get("title") == st.session_state.selected_title]
         summaries = [it.get("summary", "") for it in matched if it.get("summary")]
         if summaries:
-            st.success(f"총 {len(summaries)}개의 요약을 표시합니다.")
             # 각 summary를 expander로 보기 좋게 출력
             for idx, s in enumerate(summaries, start=1):
-                with st.expander(f"요약 {idx}", expanded=(len(summaries) == 1)):
+                with st.expander(f"요약 보기", expanded=(len(summaries) == 1)):
                     # 줄바꿈을 유지해서 표시
                     st.markdown(s.replace("\n", "  \n"))
         else:
@@ -208,9 +267,7 @@ with col2:
     st.markdown('<div class="section-title">주요 개념 학습</div>', unsafe_allow_html=True)
 
     key_concepts = [
-        "뇌와 신경망의 유사점",
-        "신경망의 입력층",
-        "출력층과 뉴런"
+        st.session_state.selected_title
     ]
 
     for concept in key_concepts:
