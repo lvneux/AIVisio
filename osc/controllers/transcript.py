@@ -6,7 +6,7 @@ import json
 import os
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-from controllers.utils import seconds_to_time_str
+from .utils import seconds_to_time_str
 
 
 def ensure_output_dir():

@@ -6,8 +6,8 @@ import json
 import os
 from datetime import datetime
 from typing import List
-from models.video_segment import VideoSegment
-from controllers.utils import seconds_to_time_str
+from ..models.video_segment import VideoSegment
+from .utils import seconds_to_time_str
 
 
 def ensure_output_dir():
