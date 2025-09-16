@@ -6,7 +6,7 @@ import json
 import os
 from datetime import datetime
 from typing import List
-from ..models.video_segment import VideoSegment
+from osc.models.video_segment import VideoSegment
 from .utils import seconds_to_time_str
 
 

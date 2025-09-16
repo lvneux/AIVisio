@@ -10,7 +10,7 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("quiz")
 
-OPENAI_API_KEY = "api_key"
+OPENAI_API_KEY = "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"
 _client = OpenAI(api_key=OPENAI_API_KEY)
 
 MODEL_FOR_GEN = "gpt-4o-mini"
