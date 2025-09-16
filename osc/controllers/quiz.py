@@ -10,8 +10,8 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("quiz")
 
-OPENAI_API_KEY = "openai"
-_client = OpenAI(api_key=OPENAI_API_KEY)
+#OPENAI_API_KEY = ""
+_client = OpenAI(api_key='')
 
 MODEL_FOR_GEN = "gpt-4o-mini"
 MODEL_FOR_JUDGE = "gpt-4o-mini"
