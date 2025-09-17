@@ -18,7 +18,7 @@ def ensure_output_dir():
     return output_dir
 
 
-def extract_transcript(video_id, lang='en'):
+def extract_transcript(video_id, lang='ko'):
     """
     YouTube 영상에서 자막을 추출합니다.
     
@@ -48,6 +48,7 @@ def extract_transcript(video_id, lang='en'):
                 print("🔄 영어 자막으로 재시도...")
                 ytt_api = YouTubeTranscriptApi()
                 transcript_data = ytt_api.fetch(video_id, languages=['en'])
+                lang = 'en'
                 print("✅ 영어 자막을 성공적으로 가져왔습니다.")
             except Exception as e2:
                 print(f"❌ 영어 자막도 실패: {e2}")

@@ -12,11 +12,11 @@ from Backend.controllers.segments import segment_video_by_description, map_subti
 from Backend.controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
 from Backend.controllers.summary import generate_summary
 
-
+"""
 def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
-    """
-    Frontend/main.py가 저장한 selected_video.json을 읽어 video_id를 반환.
-    """
+    
+    #Frontend/main.py가 저장한 selected_video.json을 읽어 video_id를 반환.
+    
     try:
         root_dir = Path(__file__).resolve().parents[1]  # 프로젝트 루트
         json_path = root_dir / "Backend" / "output" / "selected_video.json"
@@ -34,23 +34,19 @@ def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
     except Exception as e:
         print(f"⚠️ 선택 영상 로딩 중 오류: {e} → 기본 영상 ID 사용")
         return default
+"""
 
-
-def main(video_id=None, language='ko'):
+def main(video_id="E6DuimPZDz8", lang='ko'):
     """메인 실행 함수
     
     Args:
         video_id (str, optional): 분석할 YouTube 영상 ID. None이면 selected_video.json에서 로드
         language (str): 자막 언어 ('ko' 또는 'en'). 기본값은 'ko'
     """
-    if video_id is None:
-        video_id = load_selected_video_id(default="E6DuimPZDz8")
 
-    # 언어 선택 변수
-    lang = language  # 전달받은 언어 사용
 
     print("=" * 60)
-    print("🎬 YouTube 영상 분석 시작")
+    print(f"🎬 YouTube 영상 분석 시작 - Video ID: {video_id}")
     print("=" * 60)
 
     # 자막 추출

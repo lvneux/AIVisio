@@ -174,6 +174,7 @@ if "selected_subject" not in st.session_state:
 if "processed_video_ids" not in st.session_state:
     st.session_state.processed_video_ids = set()
 
+
 # 데이터 로딩
 segments, load_err = load_segments()
 titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
@@ -350,13 +351,12 @@ with st.sidebar:
 
         # 선택한 영상 정보 저장 
         if chosen_id:
-            save_selected_video(chosen_id, chosen_title)
+            #save_selected_video(chosen_id, chosen_title)
 
             if chosen_id not in st.session_state.processed_video_ids:
                 with st.spinner("선택한 영상 분석(Backend) 실행 중..."):
                     try:
-                        # 변수 전달 예시
-                        backend_main.main(video_id=chosen_id, language='ko')
+                        backend_main.main(video_id=chosen_id)
                         st.session_state.processed_video_ids.add(chosen_id)
                         st.success("영상 분석이 완료되었습니다.")
                     except Exception as e:
