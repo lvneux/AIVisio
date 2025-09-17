@@ -210,7 +210,7 @@ def thumbnail_with_duration_html(video_id: str, duration_text: str) -> str:
     </div>
     """
 
-# 자막 체크: 한국어 우선, 없으면 영어 / 자동 생성 자막 제외
+# 자막 체크: 한국어 우선, 없으면 영어 / 자동 생성 자막 제외 -> 조건 생략 중
 def has_pref_transcript(video_id: str) -> bool:
     try:
         tl = YouTubeTranscriptApi.list_transcripts(video_id)
@@ -280,8 +280,8 @@ def fetch_top_videos(subject: str):
         duration_iso = it["contentDetails"]["duration"]
         length_sec = parse_duration(duration_iso)
 
-        # 길이 (10~30분) + 자막(ko 우선, 없으면 en / 자동 생성 제외) 필터
-        if 600 <= length_sec <= 1800 and has_pref_transcript(vid):
+        # 양싱 길이 (10~30분) 필타
+        if 600 <= length_sec <= 1800:
             results.append({
                 "id": vid,
                 "title": title,
