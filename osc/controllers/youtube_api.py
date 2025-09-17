@@ -7,7 +7,7 @@ import re
 import requests
 from typing import List, Optional
 from osc.models.video_segment import VideoSegment
-from .utils import time_str_to_seconds, seconds_to_time_str
+from osc.controllers.utils import time_str_to_seconds, seconds_to_time_str
 
 # .env 파일 로드
 try:
