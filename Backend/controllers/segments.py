@@ -4,8 +4,8 @@
 
 import re
 from typing import List, Optional
-from osc.models.video_segment import VideoSegment
-from osc.controllers.utils import time_str_to_seconds, seconds_to_time_str
+from Backend.models.video_segment import VideoSegment
+from Backend.controllers.utils import time_str_to_seconds, seconds_to_time_str
 
 def segment_video_by_description(video_id: str, description: str) -> Optional[List[VideoSegment]]:
     """

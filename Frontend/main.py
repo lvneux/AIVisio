@@ -13,17 +13,17 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from osc import main as osc_main  # osc > main.py 호출
+from Backend import main as backend_main  # Backend > main.py 호출
 
 API_KEY = "AIzaSyAOwWaR6XuNF3w5YxFDSYZrPFyrEqw81UE"
 
 st.set_page_config(page_title="AIVisio", layout="wide")
 
-# 선택한 영상 정보를 osc/output/selected_video.json에 저장
+# 선택한 영상 정보를 Backend/output/selected_video.json에 저장
 def save_selected_video(video_id: str, video_title: str | None = None):
     try:
         root_dir = Path(__file__).resolve().parents[1]  # 프로젝트 루트
-        output_dir = root_dir / "osc" / "output"
+        output_dir = root_dir / "Backend" / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         payload = {
             "video_id": video_id,
@@ -40,7 +40,7 @@ def save_selected_video(video_id: str, video_title: str | None = None):
 def load_segments():
     try:
         root_dir = Path(__file__).resolve().parents[1]
-        json_path = root_dir / "osc" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
+        json_path = root_dir / "Backend" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
 
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -353,13 +353,14 @@ with st.sidebar:
             save_selected_video(chosen_id, chosen_title)
 
             if chosen_id not in st.session_state.processed_video_ids:
-                with st.spinner("선택한 영상 분석(osc) 실행 중..."):
+                with st.spinner("선택한 영상 분석(Backend) 실행 중..."):
                     try:
-                        osc_main.main()
+                        # 변수 전달 예시
+                        backend_main.main(video_id=chosen_id, language='ko')
                         st.session_state.processed_video_ids.add(chosen_id)
                         st.success("영상 분석이 완료되었습니다.")
                     except Exception as e:
-                        st.error(f"osc.main 실행 중 오류: {e}")
+                        st.error(f"Backend.main 실행 중 오류: {e}")
 
         if st.session_state["selected_video_id"]:
             st.session_state.learning_started = True

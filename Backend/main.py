@@ -6,11 +6,11 @@ YouTube 영상 분석 메인 스크립트
 import json
 from pathlib import Path
 
-from osc.controllers.transcript import extract_transcript
-from osc.controllers.youtube_api import get_youtube_chapters
-from osc.controllers.segments import segment_video_by_description, map_subtitles_to_segments
-from osc.controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
-from osc.controllers.summary import generate_summary
+from Backend.controllers.transcript import extract_transcript
+from Backend.controllers.youtube_api import get_youtube_chapters
+from Backend.controllers.segments import segment_video_by_description, map_subtitles_to_segments
+from Backend.controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
+from Backend.controllers.summary import generate_summary
 
 
 def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
@@ -19,7 +19,7 @@ def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
     """
     try:
         root_dir = Path(__file__).resolve().parents[1]  # 프로젝트 루트
-        json_path = root_dir / "osc" / "output" / "selected_video.json"
+        json_path = root_dir / "Backend" / "output" / "selected_video.json"
         if not json_path.exists():
             print("⚠️ selected_video.json이 없어 기본 영상 ID를 사용합니다.")
             return default
@@ -36,12 +36,18 @@ def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
         return default
 
 
-def main():
-    """메인 실행 함수"""
-    video_id = load_selected_video_id(default="E6DuimPZDz8")
+def main(video_id=None, language='ko'):
+    """메인 실행 함수
+    
+    Args:
+        video_id (str, optional): 분석할 YouTube 영상 ID. None이면 selected_video.json에서 로드
+        language (str): 자막 언어 ('ko' 또는 'en'). 기본값은 'ko'
+    """
+    if video_id is None:
+        video_id = load_selected_video_id(default="E6DuimPZDz8")
 
     # 언어 선택 변수
-    lang = 'ko'  # 'en' 또는 'ko'로 변경
+    lang = language  # 전달받은 언어 사용
 
     print("=" * 60)
     print("🎬 YouTube 영상 분석 시작")

@@ -8,7 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from osc.controllers.quiz import generate_quizzes, check_answer  
+from Backend.controllers.quiz import generate_quizzes, check_answer  
 
 st.set_page_config(page_title="AIVisio - Quiz", layout="wide")
 
@@ -16,9 +16,9 @@ st.set_page_config(page_title="AIVisio - Quiz", layout="wide")
 def load_segments() -> List[Dict[str, Any]]:
     """
     Load the same segments JSON used by main.py.
-    Path: root/osc/output/E6DuimPZDz8_segments_with_subtitles.json
+    Path: root/Backend/output/E6DuimPZDz8_segments_with_subtitles.json
     """
-    json_path = ROOT_DIR / "osc" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
+    json_path = ROOT_DIR / "Backend" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
     if not json_path.exists():
         st.error(f"세그먼트 파일을 찾을 수 없습니다: {json_path}")
         return []
