@@ -2,7 +2,7 @@
 Models package for OSC  analysis
 """
 
-from .video_segment import VideoSegment
+from osc.models.video_segment import VideoSegment
 
 __all__ = [
     'VideoSegment'
