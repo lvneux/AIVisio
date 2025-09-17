@@ -39,7 +39,7 @@ def get_youtube_video_info(video_id: str) -> Optional[dict]:
         url = f"https://www.googleapis.com/youtube/v3/videos"
         
         # API 키는 환경변수에서 가져오기
-        api_key = os.getenv('YOUTUBE_API_KEY', '')
+        api_key = 'AIzaSyAOwWaR6XuNF3w5YxFDSYZrPFyrEqw81UE'
 
         if api_key == None:
             api_key = "AIzaSyAOwWaR6XuNF3w5YxFDSYZrPFyrEqw81UE"
