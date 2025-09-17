@@ -106,7 +106,7 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
     }
     
     # AI 요약 함수 import
-    from controllers.summary import generate_summary
+    from osc.controllers.summary import generate_summary
     
     for i, segment in enumerate(segments):
         print(f"🤖 세그먼트 {i+1}/{len(segments)} AI 요약 생성 중...")
