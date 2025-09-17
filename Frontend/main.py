@@ -103,8 +103,22 @@ st.markdown("""
     .logo-text { font-family: 'Trebuchet MS', sans-serif; font-size: 26px; font-weight: bold; color: #333; }
     .section-title { font-size: 20px !important; font-weight: 600; margin-bottom: 8px; }
     .chapter-box { padding: 10px; background-color: #f0f2f6; border-radius: 10px; margin-bottom: 5px; font-size: 14px; }
+    .dropdown-adjust { padding-top: 38px; }
     label[for="memo"] > div:first-child { display: none; }
     .video-title { font-size: 13px; font-weight: 600; line-height: 1.2; margin: 4px 0 8px; }
+    
+    button[disabled][data-testid="baseButton-secondary"]{
+      background: #e5e7eb !important;   /* bg-gray-200 */
+      border-color: #d1d5db !important;  /* border-gray-300 */
+      color: #6b7280 !important;         /* text-gray-500 */
+      opacity: 0.85;
+      cursor: not-allowed !important;
+    }
+    
+    
+    button[disabled][data-testid="baseButton-secondary"]:hover{
+      filter: none !important;
+      transform: none !important;}
 
     /* 썸네일 카드 컨테이너 */
     .thumb-wrap {
@@ -137,6 +151,7 @@ st.markdown("""
         font-weight: 600;
         line-height: 1;
     }
+    div[data-testid="stSelectbox"] > label { display:none; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -409,6 +424,21 @@ with col2:
             st.warning("해당 챕터에 summary가 없습니다.")
     else:
         st.info("좌측에서 챕터를 선택하면 summary가 표시됩니다.")
+        
+    st.markdown("---")
+    st.markdown('<div class="section-title">주요 개념 학습</div>', unsafe_allow_html=True)
+
+    key_concepts = [st.session_state.selected_title] if st.session_state.selected_title else []
+    for concept in key_concepts:
+        col_concept, col_button = st.columns([4, 1])
+        col_concept.markdown(f"- {concept}", unsafe_allow_html=True)
+        if col_button.button("관련 문제 풀기", key=f"concept_quiz_{concept}"):
+            st.session_state.quiz_title = concept
+            try:
+                st.switch_page("pages/quiz_page.py")
+            except Exception:
+                st.experimental_set_query_params(quiz_title=concept)
+                st.rerun()
 
 with col3:
     st.markdown('<div class="section-title">✏️ 학습 메모</div>', unsafe_allow_html=True)
