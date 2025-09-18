@@ -37,10 +37,12 @@ def save_selected_video(video_id: str, video_title: str | None = None):
 
 # JSON 로더 (기존 챕터 처리 유지)
 @st.cache_data(show_spinner=False)
-def load_segments():
+def load_segments(video_id: str | None):
+    if not video_id:
+        return [], "video_id가 지정되지 않았습니다."
     try:
         root_dir = Path(__file__).resolve().parents[1]
-        json_path = root_dir / "Backend" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
+        json_path = root_dir / "Backend" / "output" / f"{video_id}_segments_with_subtitles.json"
 
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -173,11 +175,6 @@ if "selected_subject" not in st.session_state:
     st.session_state.selected_subject = "Python"
 if "processed_video_ids" not in st.session_state:
     st.session_state.processed_video_ids = set()
-
-
-# 데이터 로딩
-segments, load_err = load_segments()
-titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
 
 # YouTube API/썸네일 유틸
 def yt_thumb(id_: str, quality: str = "hqdefault"):
@@ -346,12 +343,11 @@ with st.sidebar:
         chosen_id, chosen_title = None, None
 
     if st.button("학습 시작"):
-        st.session_state.selected_video_id = chosen_id
-        st.session_state.selected_video_title = chosen_title
 
         # 선택한 영상 정보 저장 
         if chosen_id:
-            #save_selected_video(chosen_id, chosen_title)
+            st.session_state.selected_video_id = chosen_id
+            st.session_state.selected_video_title = chosen_title
 
             if chosen_id not in st.session_state.processed_video_ids:
                 with st.spinner("선택한 영상 분석(Backend) 실행 중..."):
@@ -362,8 +358,9 @@ with st.sidebar:
                     except Exception as e:
                         st.error(f"Backend.main 실행 중 오류: {e}")
 
-        if st.session_state["selected_video_id"]:
             st.session_state.learning_started = True
+        else:
+            st.error("영상을 먼저 선택해주세요.")
 
 # 영상 선택
 if not st.session_state.learning_started:
@@ -372,6 +369,9 @@ if not st.session_state.learning_started:
         st.markdown("### 선택 예정 영상 미리보기")
         render_video(st.session_state.selected_video_id, height=420)
     st.stop()
+    
+segments, load_err = load_segments(st.session_state.selected_video_id)
+titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
 
 # 기존 main 페이지
 col1, col2, col3 = st.columns([1.5, 3.5, 2])
@@ -400,7 +400,7 @@ with col2:
                 seg_to_play = c
                 break
 
-    if seg_to_play and st.session_state.selected_video_id == "E6DuimPZDz8":
+    if seg_to_play and seg_to_play.get("start_sec") is not None and seg_to_play.get("end_sec") is not None:
         render_video(
             video_id=st.session_state.selected_video_id,
             start=int(seg_to_play["start_sec"]),
