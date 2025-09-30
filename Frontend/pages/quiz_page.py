@@ -18,10 +18,8 @@ def load_segments() -> List[Dict[str, Any]]:
     Load the same segments JSON used by main.py.
     Path: root/Backend/output/E6DuimPZDz8_segments_with_subtitles.json
     """
-    json_path = ROOT_DIR / "Backend" / "output" / "E6DuimPZDz8_segments_with_subtitles.json"
-    if not json_path.exists():
-        st.error(f"세그먼트 파일을 찾을 수 없습니다: {json_path}")
-        return []
+    json_path = "./Backend/output/aircAruvnKk_segments_with_subtitles.json"
+
     try:
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)

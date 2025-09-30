@@ -15,7 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from Backend import main as backend_main  # Backend > main.py 호출
 
-API_KEY = "AIzaSyAOwWaR6XuNF3w5YxFDSYZrPFyrEqw81UE"
+API_KEY = ""
 
 st.set_page_config(page_title="AIVisio", layout="wide")
 
