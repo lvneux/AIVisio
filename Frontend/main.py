@@ -8,14 +8,18 @@ from datetime import datetime
 from pathlib import Path
 from streamlit import components
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
+# .env 파일 로드
+load_dotenv(ROOT_DIR / ".env")
+
 from Backend import main as backend_main  # Backend > main.py 호출
 
-API_KEY = ""
+API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
 st.set_page_config(page_title="AIVisio", layout="wide")
 
@@ -172,7 +176,7 @@ if "selected_video_title" not in st.session_state:
 if "learning_started" not in st.session_state:
     st.session_state.learning_started = False
 if "selected_subject" not in st.session_state:
-    st.session_state.selected_subject = "Python"
+    st.session_state.selected_subject = "Deep Learning"
 if "processed_video_ids" not in st.session_state:
     st.session_state.processed_video_ids = set()
 

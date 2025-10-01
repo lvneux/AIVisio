@@ -17,11 +17,11 @@ try:
     current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     env_path = os.path.join(current_dir, '.env')
     load_dotenv(env_path)
-    print(f"✅ .env 파일 로드 완료: {env_path}")
+    print(f"[OK] .env 파일 로드 완료: {env_path}")
 except ImportError:
-    print("⚠️ python-dotenv가 설치되지 않음, 환경변수 직접 사용")
+    print("[WARNING] python-dotenv가 설치되지 않음, 환경변수 직접 사용")
 except Exception as e:
-    print(f"⚠️ .env 파일 로드 실패: {e}")
+    print(f"[WARNING] .env 파일 로드 실패: {e}")
 
 
 def get_youtube_video_info(video_id: str) -> Optional[dict]:
@@ -39,13 +39,10 @@ def get_youtube_video_info(video_id: str) -> Optional[dict]:
         url = f"https://www.googleapis.com/youtube/v3/videos"
         
         # API 키는 환경변수에서 가져오기
-        api_key = ''
-
-        if api_key == None:
-            api_key = ""
+        api_key = os.getenv('YOUTUBE_API_KEY', '')
 
         if not api_key:
-            print("⚠️ YouTube API 키가 설정되지 않았습니다.")
+            print("[WARNING] YouTube API 키가 설정되지 않았습니다.")
             print("   .env 파일에 YOUTUBE_API_KEY를 설정해주세요.")
             return None
         
@@ -61,20 +58,20 @@ def get_youtube_video_info(video_id: str) -> Optional[dict]:
         data = response.json()
         
         if not data.get('items'):
-            print(f"❌ 비디오 ID {video_id}를 찾을 수 없습니다.")
+            print(f"[ERROR] 비디오 ID {video_id}를 찾을 수 없습니다.")
             return None
         
         video_info = data['items'][0]
-        print(f"✅ YouTube 비디오 정보를 성공적으로 가져왔습니다.")
+        print(f"[OK] YouTube 비디오 정보를 성공적으로 가져왔습니다.")
         print(f"   제목: {video_info['snippet']['title']}")
         
         return video_info
         
     except requests.exceptions.RequestException as e:
-        print(f"❌ YouTube API 요청 중 오류: {e}")
+        print(f"[ERROR] YouTube API 요청 중 오류: {e}")
         return None
     except Exception as e:
-        print(f"❌ 비디오 정보 가져오기 중 오류: {e}")
+        print(f"[ERROR] 비디오 정보 가져오기 중 오류: {e}")
         return None
 
 
@@ -114,12 +111,12 @@ def get_youtube_chapters(video_id: str) -> Optional[List[VideoSegment]]:
     Returns:
         Optional[List[VideoSegment]]: 챕터 세그먼트 리스트
     """
-    print(f"🔍 YouTube 챕터 추출 중: {video_id}")
+    print(f"[INFO] YouTube 챕터 추출 중: {video_id}")
     
     # 1. YouTube API로 비디오 정보 가져오기
     video_info = get_youtube_video_info(video_id)
     if not video_info:
-        print("⚠️ YouTube API를 사용할 수 없어 설명에서 챕터를 추출합니다.")
+        print("[WARNING] YouTube API를 사용할 수 없어 설명에서 챕터를 추출합니다.")
         return None
     
     # 2. 설명에서 챕터 정보 추출
@@ -127,10 +124,10 @@ def get_youtube_chapters(video_id: str) -> Optional[List[VideoSegment]]:
     chapters = extract_chapters_from_description(description)
     
     if not chapters:
-        print("⚠️ 설명에서 챕터 정보를 찾을 수 없습니다.")
+        print("[WARNING] 설명에서 챕터 정보를 찾을 수 없습니다.")
         return None
     
-    print(f"✅ {len(chapters)}개의 챕터를 찾았습니다.")
+    print(f"[OK] {len(chapters)}개의 챕터를 찾았습니다.")
     
     # 3. VideoSegment 객체로 변환
     segments = []
@@ -158,6 +155,6 @@ def get_youtube_chapters(video_id: str) -> Optional[List[VideoSegment]]:
             dok_level="Level 2"
         )
         segments.append(segment)
-        print(f"   📌 {title} ({seconds_to_time_str(start_sec)} - {seconds_to_time_str(end_sec)})")
+        print(f"   - {title} ({seconds_to_time_str(start_sec)} - {seconds_to_time_str(end_sec)})")
     
     return segments 
