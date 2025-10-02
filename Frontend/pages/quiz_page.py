@@ -106,18 +106,11 @@ for idx, q in enumerate(quizzes):
     st.markdown(f'<div class="qtitle">문항 {idx+1}</div>', unsafe_allow_html=True)
     st.markdown(q["question"])
 
-    qtype = q.get("type", "short")
-
-    if qtype == "OX":
-        default_idx = 0 if states[idx]["answer"] in ["", "O"] else 1
-        choice = st.radio(
-            "정답을 선택하세요:",
-            options=["O", "X"],
-            index=default_idx,
-            key=f"q_{idx}_choice",
-            horizontal=True,
-        )
-        states[idx]["answer"] = choice
+    states[idx]["answer"] = st.text_input(
+        "정답을 입력하세요:",
+        value=states[idx]["answer"],
+        key=f"q_{idx}_input",
+    )
 
     col_check, col_retry = st.columns([1, 1])
 
@@ -128,7 +121,7 @@ for idx, q in enumerate(quizzes):
         states[idx]["feedback"] = result.get("feedback", "")
 
     if col_retry.button("다시 시도", key=f"retry_{idx}"):
-        states[idx]["answer"] = "" if qtype == "short" else "O"
+        states[idx]["answer"] = ""
         states[idx]["is_correct"] = False
         states[idx]["feedback"] = ""
 
@@ -137,7 +130,7 @@ for idx, q in enumerate(quizzes):
     elif states[idx]["feedback"]:
         st.error(states[idx]["feedback"])
 
-    st.markdown("</div>", unsafe_allow_html=True) 
+    st.markdown("</div>", unsafe_allow_html=True)
 
     all_correct = all_correct and states[idx]["is_correct"]
 
