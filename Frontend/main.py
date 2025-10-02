@@ -102,7 +102,7 @@ def unique_preserve_order(seq):
             out.append(x)
     return out
 
-# 스타일 (+ 오버레이 배지 스타일 추가)
+# ------------------ 스타일 ------------------
 st.markdown("""
     <style>
     .logo-box { background-color: #fff9d6; border-radius: 10px; padding: 10px 20px; margin: 0px; position: absolute; top: 10px; left: 10px; }
@@ -112,59 +112,75 @@ st.markdown("""
     .dropdown-adjust { padding-top: 38px; }
     label[for="memo"] > div:first-child { display: none; }
     .video-title { font-size: 13px; font-weight: 600; line-height: 1.2; margin: 4px 0 8px; }
-    
+
     button[disabled][data-testid="baseButton-secondary"]{
-      background: #e5e7eb !important;   /* bg-gray-200 */
-      border-color: #d1d5db !important;  /* border-gray-300 */
-      color: #6b7280 !important;         /* text-gray-500 */
+      background: #e5e7eb !important;
+      border-color: #d1d5db !important;
+      color: #6b7280 !important;
       opacity: 0.85;
       cursor: not-allowed !important;
     }
-    
-    
     button[disabled][data-testid="baseButton-secondary"]:hover{
-      filter: none !important;
-      transform: none !important;}
+      filter: none !important; transform: none !important;
+    }
 
     /* 썸네일 카드 컨테이너 */
-    .thumb-wrap {
-        position: relative;
-        width: 100%;
-        border-radius: 8px;
-        overflow: hidden;
-        background: #000;
-        margin-bottom: 6px;
-    }
-    /* 16:9 비율 유지 */
-    .thumb-inner {
-        position: relative;
-        width: 100%;
-        padding-bottom: 56.25%;
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-    }
-    /* 길이 배지 */
+    .thumb-wrap { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+    .thumb-inner { position: relative; width: 100%; padding-bottom: 56.25%; background-size: cover; background-position: center; background-repeat: no-repeat; }
     .duration-badge {
-        position: absolute;
-        right: 6px;
-        bottom: 6px;
-        background: rgba(0,0,0,0.75);
-        color: #fff;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1;
+        position: absolute; right: 6px; bottom: 6px;
+        background: rgba(0,0,0,0.75); color: #fff;
+        padding: 2px 6px; border-radius: 4px;
+        font-size: 12px; font-weight: 600; line-height: 1;
     }
     div[data-testid="stSelectbox"] > label { display:none; }
+
+    /* ---------- 사이드바 영상 선택: 커스텀 단일 선택 행 ---------- */
+    [data-testid="stSidebar"] .pick-row {
+        border: 1.5px solid transparent;
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+        background: transparent;
+    }
+    [data-testid="stSidebar"] .pick-row:hover {
+        border-color: transparent !important;
+        background: transparent !important;
+        cursor: default !important;
+    }
+    /* 좌측 버튼(선택 표시) */
+    [data-testid="stSidebar"] .pick-row .stButton > button {
+        width: 36px; height: 36px; min-width: 36px;
+        padding: 0;
+        border-radius: 4px;
+        line-height: 1;
+        font-weight: 700;
+        border: 2px solid #b6b6b6;
+        background: white;
+        color: transparent;
+        display: flex; justify-content: center; align-items: center;
+    }
+    [data-testid="stSidebar"] .pick-row .stButton > button.selected-button {
+        border-color: #3b82f6;
+        background: #3b82f6;
+        color: white;
+    }
+    [data-testid="stSidebar"] .pick-row .stButton > button:hover {
+        filter: none !important; transform: none !important;
+        background: inherit; border-color: inherit; color: inherit;
+    }
+    /* 썸네일 간격 */
+    [data-testid="stSidebar"] .pick-row .stColumn:first-child { padding-right: 15px; }
+    /* 학습 시작 버튼 중앙 정렬 */
+    .center-wrap { display: flex; justify-content: center; margin-top: 20px; }
+    .center-wrap button { width: auto; padding: 10px 20px; font-size: 16px; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="logo-box"><div class="logo-text">AIVisio</div></div>', unsafe_allow_html=True)
 st.markdown("<br><br><br>", unsafe_allow_html=True)
 
-# 상태 초기화
+# ------------------ 상태 초기화 ------------------
 if "selected_title" not in st.session_state:
     st.session_state.selected_title = None
 if "completed_chapters" not in st.session_state:
@@ -179,6 +195,9 @@ if "selected_subject" not in st.session_state:
     st.session_state.selected_subject = "Deep Learning"
 if "processed_video_ids" not in st.session_state:
     st.session_state.processed_video_ids = set()
+# (추가) 사이드바 단일 선택 인덱스 상태
+if "video_choice_idx" not in st.session_state:
+    st.session_state.video_choice_idx = 0
 
 # YouTube API/썸네일 유틸
 def yt_thumb(id_: str, quality: str = "hqdefault"):
@@ -297,7 +316,7 @@ def fetch_top_videos(subject: str):
         duration_iso = it["contentDetails"]["duration"]
         length_sec = parse_duration(duration_iso)
 
-        # 양싱 길이 (10~30분) 필타
+        # 영상 길이 (10~30분) 필터
         if 600 <= length_sec <= 1800:
             results.append({
                 "id": vid,
@@ -309,7 +328,7 @@ def fetch_top_videos(subject: str):
     # 상위 3개만 반환
     return results[:3]
 
-# 사이드바: subject 선택 & 영상 선택
+# ------------------ 사이드바 (디자인 적용) ------------------
 with st.sidebar:
     st.header("학습 준비")
 
@@ -319,39 +338,75 @@ with st.sidebar:
         subjects,
         index=subjects.index(st.session_state.selected_subject)
     )
+    # 주제가 바뀌면 선택 인덱스 초기화
+    if subject != st.session_state.selected_subject:
+        st.session_state.video_choice_idx = 0
+        st.session_state.selected_video_id = None
+        st.session_state.selected_video_title = None
     st.session_state.selected_subject = subject
 
     try:
         vids = fetch_top_videos(subject)
-        st.caption("학습할 영상을 선택하세요.")
+        st.caption("학습할 **영상 1개**를 선택하세요. (단일 선택)")
 
-        options = []
-        for i, v in enumerate(vids):
-            # 썸네일 + 길이
-            st.markdown(thumbnail_with_duration_html(v["id"], v["duration_text"]), unsafe_allow_html=True)
-            st.markdown(f'<div class="video-title">{v["title"]}</div>', unsafe_allow_html=True)
-            options.append(f"{i+1}. {v['title']} ({v['duration_text']})")
-
-        if options:
-            default_idx = 0 if st.session_state.selected_video_id is None else \
-                next((i for i, v in enumerate(vids) if v["id"] == st.session_state.selected_video_id), 0)
-            choice = st.radio("영상 선택", options, index=default_idx, label_visibility="collapsed")
-            chosen_idx = options.index(choice)
-            chosen_id = vids[chosen_idx]["id"]
-            chosen_title = vids[chosen_idx]["title"]
-        else:
+        if not vids:
             st.error("자막 기준(한국어 우선, 없으면 영어 / 자동 생성 제외)에 맞는 영상이 없습니다.")
             chosen_id, chosen_title = None, None
+        else:
+            # 현재 선택 인덱스 보정
+            if st.session_state.video_choice_idx >= len(vids):
+                st.session_state.video_choice_idx = 0
+
+            # 각 항목을 카드형으로 렌더링 (버튼+썸네일+제목)
+            for i, v in enumerate(vids):
+                st.markdown('<div class="pick-row">', unsafe_allow_html=True)
+                left, right = st.columns([1, 12], vertical_alignment="top")
+
+                selected = (i == st.session_state.video_choice_idx)
+                # 좌측 '선택' 버튼
+                with left:
+                    label = "✔" if selected else ""
+                    if st.button(label, key=f"pick_btn_{i}", help="클릭하여 영상 선택"):
+                        st.session_state.video_choice_idx = i
+                        st.rerun()
+                    # 선택된 경우 버튼 컬러 채우기
+                    if selected:
+                        st.markdown(
+                            "<style>"
+                            "div[data-testid='stSidebar'] .pick-row .stButton > button {"
+                            "border-color:#3b82f6;background:#3b82f6;color:#ffffff;}"
+                            "</style>", unsafe_allow_html=True
+                        )
+
+                # 우측 썸네일 + 제목
+                with right:
+                    st.markdown(
+                        thumbnail_with_duration_html(v["id"], v["duration_text"]),
+                        unsafe_allow_html=True
+                    )
+                    st.markdown(f'<div class="video-title">{v["title"]}</div>', unsafe_allow_html=True)
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # 최종 선택값
+            chosen_id = vids[st.session_state.video_choice_idx]["id"]
+            chosen_title = vids[st.session_state.video_choice_idx]["title"]
+
     except Exception as e:
         st.error(f"유튜브 API 오류: {e}")
         chosen_id, chosen_title = None, None
 
-    if st.button("학습 시작"):
+    # 학습 시작 버튼: 가운데 정렬
+    st.markdown('<div class="center-wrap">', unsafe_allow_html=True)
+    start_clicked = st.button("학습 시작")
+    st.markdown('</div>', unsafe_allow_html=True)
 
+    if start_clicked:
         # 선택한 영상 정보 저장 
         if chosen_id:
             st.session_state.selected_video_id = chosen_id
             st.session_state.selected_video_title = chosen_title
+            save_selected_video(chosen_id, chosen_title)
 
             if chosen_id not in st.session_state.processed_video_ids:
                 with st.spinner("선택한 영상 분석(Backend) 실행 중..."):
@@ -366,6 +421,7 @@ with st.sidebar:
         else:
             st.error("영상을 먼저 선택해주세요.")
 
+# ------------------ 메인 화면 ------------------
 # 영상 선택
 if not st.session_state.learning_started:
     st.info("👈 좌측 **사이드바**에서 주제를 고르고 영상 1개를 선택한 뒤 **[학습 시작]**을 눌러주세요.")
@@ -435,9 +491,10 @@ with col2:
 
     key_concepts = [st.session_state.selected_title] if st.session_state.selected_title else []
     for concept in key_concepts:
-        col_concept, col_button = st.columns([4, 1])
+        # ▼ 버튼 영역만 살짝 넓혀 한 줄 표시가 되도록 조정
+        col_concept, col_button = st.columns([4, 1.6])
         col_concept.markdown(f"- {concept}", unsafe_allow_html=True)
-        if col_button.button("관련 문제 풀기", key=f"concept_quiz_{concept}"):
+        if col_button.button("관련 문제 풀기", key=f"concept_quiz_{concept}", use_container_width=True):
             st.session_state.quiz_title = concept
             try:
                 st.switch_page("pages/quiz_page.py")
