@@ -139,16 +139,17 @@ def check_answer(quiz: Dict[str, Any], user_answer: str) -> Dict[str, Any]:
 
     try:
         judge_system = (
-            "You are a strict short-answer judge. "
-            "Given the question, ground-truth short answer, and user answer, "
-            'reply JSON ONLY: {"correct": true|false, "hint": "..."} . '
-            "Accept minor synonyms/typos if meaning matches."
+            "당신은 매우 엄격한 단답형 채점자입니다. "
+            "질문, 정답(ground truth), 사용자 답안을 보고 정답 여부를 판단하세요. "
+            '반드시 JSON만 반환하세요: {"correct": true|false, "hint": "..."} . '
+            "의미가 일치하면 경미한 오타/동의어는 허용하세요. "
+            "사용자가 오답을 말하면 당신은 힌트를 제공합니다. 힌트는 반드시 한국어로 작성하세요."
         )
         judge_user = (
             f"Question: {quiz.get('question','')}\n"
             f"Ground Truth: {gt}\n"
             f"User Answer: {ua}\n"
-            "Is the user answer correct?"
+            "사용자 답이 정답인가요?"
         )
         resp = _client.chat.completions.create(
             model=MODEL_FOR_JUDGE,
