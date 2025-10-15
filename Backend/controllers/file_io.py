@@ -96,7 +96,9 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
     output_dir = ensure_output_dir()
     
     if output_path is None:
-        output_path = f'{output_dir}/{video_id}_segments_with_subtitles.json'
+        # 언어 코드를 파일명에 포함
+        lang_suffix = "kr" if language_code == "ko" else "en"
+        output_path = f'{output_dir}/{video_id}_segments_with_subtitles_{lang_suffix}.json'
     
     segments_data = {
         "video_id": video_id,
@@ -117,6 +119,9 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
         else:
             ai_summary = "자막이 부족하여 요약할 수 없습니다."
         
+        # Bloom 인지단계 분류 결과 가져오기
+        bloom_category = getattr(segment, 'bloom_category', 'Unknown')
+        
         segment_dict = {
             "id": segment.id,
             "title": segment.title,
@@ -127,6 +132,7 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
             "duration": segment.end_time - segment.start_time,
             "summary": ai_summary,  # AI 요약 사용
             "subtitles": segment.subtitles,
+            "bloom_category": bloom_category,  # Bloom 인지단계 분류 결과
             "tags": segment.tags,
             "keywords": segment.keywords
         }
@@ -135,4 +141,4 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(segments_data, f, ensure_ascii=False, indent=2)
     
-    print(f"✅ AI 요약이 포함된 세그먼트 JSON 저장 완료: {output_path}") 
+    print(f"✅ AI 요약과 Bloom 분류가 포함된 세그먼트 JSON 저장 완료: {output_path}") 

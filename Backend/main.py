@@ -6,11 +6,12 @@ YouTube 영상 분석 메인 스크립트
 import json
 from pathlib import Path
 
-from Backend.controllers.transcript import extract_transcript
-from Backend.controllers.youtube_api import get_youtube_chapters
-from Backend.controllers.segments import segment_video_by_description, map_subtitles_to_segments
-from Backend.controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
-from Backend.controllers.summary import generate_summary
+from .controllers.transcript import extract_transcript
+from .controllers.youtube_api import get_youtube_chapters
+from .controllers.segments import segment_video_by_description, map_subtitles_to_segments
+from .controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
+from .controllers.summary import generate_summary
+from .controllers.bloom_classifier import BloomClassifier
 
 """
 def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
@@ -36,7 +37,7 @@ def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
         return default
 """
 
-def main(video_id="E6DuimPZDz8", lang='ko'):
+def main(video_id="E6DuimPZDz8", lang='en'):
     """메인 실행 함수
     
     Args:
@@ -82,9 +83,24 @@ def main(video_id="E6DuimPZDz8", lang='ko'):
         if transcript_data:
             segments = map_subtitles_to_segments(segments, transcript_data)
 
+        # Bloom 인지단계 분류
+        print(f"\n" + "=" * 60)
+        print("🧠 Bloom 인지단계 분류")
+        print("=" * 60)
+        
+        try:
+            bloom_classifier = BloomClassifier()
+            segments = bloom_classifier.predict_segments(segments)
+        except Exception as e:
+            print(f"⚠️ Bloom 분류 중 오류 발생: {e}")
+            print("   Bloom 분류 없이 진행합니다.")
+            # 오류가 발생해도 계속 진행
+            for segment in segments:
+                segment.bloom_category = "Unknown"
+
         # 세그먼트 정보 저장
-        save_segments_to_json(segments, video_id)
-        save_segments_to_txt(segments, video_id)
+        #save_segments_to_json(segments, video_id)
+        #save_segments_to_txt(segments, video_id)
         save_segments_with_subtitles_to_json(segments, video_id, language_code=lang)
 
         print(f"\n📈 세그먼트 분석 결과:")
@@ -92,6 +108,16 @@ def main(video_id="E6DuimPZDz8", lang='ko'):
         if segments:
             avg_duration = sum(seg.end_time - seg.start_time for seg in segments) / len(segments)
             print(f"   - 평균 세그먼트 길이: {avg_duration:.1f}초")
+            
+            # Bloom 분류 결과 요약
+            bloom_counts = {}
+            for seg in segments:
+                category = getattr(seg, 'bloom_category', 'Unknown')
+                bloom_counts[category] = bloom_counts.get(category, 0) + 1
+            
+            print(f"\n🧠 Bloom 인지단계 분포:")
+            for category, count in bloom_counts.items():
+                print(f"   - {category}: {count}개")
     else:
         print("⚠️ 세그먼트를 추출할 수 없습니다.")
 
@@ -99,4 +125,6 @@ def main(video_id="E6DuimPZDz8", lang='ko'):
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    video_id = sys.argv[1] if len(sys.argv) > 1 else "aircAruvnKk"
+    main(video_id)
