@@ -9,7 +9,6 @@ from pathlib import Path
 from streamlit import components
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from dotenv import load_dotenv
-import base64 # 👈 [추가] Base64 인코딩을 위한 모듈 임포트
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -134,103 +133,68 @@ def unique_preserve_order(seq):
             out.append(x)
     return out
 
-# --- [수정] 커스텀 로딩 오버레이 함수 (Base64 인코딩 적용) ---
 def display_loading_overlay():
-    # 이미지 파일 순서: 맨 앞 사진부터 5개 순서대로
-    image_files = [
-        "img_1.png",
-        "img_2.png",
-        "img_3.png",
-        "img_4.png",
-        "img_5.png",
-    ]
-    
-    # 이미지 파일 경로 (Frontend/assets/ 하위에 파일이 있어야 함)
-    # Streamlit 앱 파일 (main.py)이 Frontend에 있으므로 Path(__file__).parent 사용
-    asset_dir = Path(__file__).parent / "assets"
-    
-    # --- CSS Keyframes Generation ---
-    keyframes = []
-    num_frames = len(image_files)
-    duration_per_frame_sec = 1.5
-    total_duration_sec = num_frames * duration_per_frame_sec # 7.5s (5장 * 1.5초)
-    duration_percent_step = 100 / num_frames # 20%
-
-    for i, file_name in enumerate(image_files):
-        img_path = asset_dir / file_name
-        img_data_url = ""
-        
-        # 파일이 존재하는지 확인하고 Base64로 인코딩
-        if img_path.exists():
-            with open(img_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode()
-                # Data URL 형식: 'data:[<MIME-type>][;charset=<encoding>][;base64],<data>'
-                img_data_url = f"data:image/png;base64,{encoded}"
-        else:
-            # 파일이 없을 경우 경고 메시지를 로그에 출력하거나 대체 이미지 사용
-            st.warning(f"로딩 이미지 파일을 찾을 수 없습니다: {img_path}")
-            continue # 해당 프레임은 건너뜀
-
-        # 시작 퍼센트 (e.g., 0%, 20%, 40%, ...)
-        start_percent = i * duration_percent_step
-        # 끝 퍼센트 (다음 프레임 직전)
-        end_percent = (i + 1) * duration_percent_step - 0.001 
-        
-        keyframes.append(f"""
-        {start_percent:.1f}% {{ background-image: url('{img_data_url}'); }}
-        {end_percent:.1f}% {{ background-image: url('{img_data_url}'); }}
-        """)
-    
-    keyframes_css = "\n".join(keyframes)
-    
-    if not keyframes_css:
-        # 이미지를 하나도 로드하지 못했을 경우 (파일이 없거나 경로 문제)
-        st.error("로딩 화면용 이미지를 로드할 수 없습니다. 'Frontend/assets' 폴더에 파일이 있는지 확인하세요.")
-        return
-        
-    # --- HTML/CSS Injection ---
     st.markdown(
-        f"""
+        """
         <style>
-            /* 로딩 오버레이 */
-            .custom-loading-overlay {{
+            .custom-loading-overlay {
                 position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background-color: white; /* 흰색 배경 */
+                inset: 0;
+                background: #ffffff;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                z-index: 9999; /* 최상위 레이어 */
-                
-                /* Streamlit의 메인 컨텐츠 위에 확실히 덮도록 마진/패딩 제거 */
+                z-index: 9999;
                 margin: 0; padding: 0;
                 width: 100%; height: 100%;
-            }}
-            
-            /* 애니메이션 컨테이너 (창 크기에 맞게) */
-            .animation-container {{
-                width: 80vw; 
-                height: 80vh;
-                background-repeat: no-repeat;
-                background-position: center center;
-                background-size: contain; /* 이미지 전체가 보이도록 크기 조정 (가운데 로고 등 유지) */
-                
-                /* 배경 이미지 애니메이션 */
-                animation: image-sequence {total_duration_sec}s infinite steps(1); 
-            }}
-            
-            @keyframes image-sequence {{
-                {keyframes_css}
-            }}
-            
+            }
+            .loader-wrap {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+            }
+            /* 점프하는 점 3개 */
+            .dots {
+                display: flex;
+                gap: 10px;
+                height: 12px;
+            }
+            .dot {
+                width: 10px;
+                height: 10px;
+                background: #4f46e5;
+                border-radius: 50%;
+                animation: bounce 1.2s infinite ease-in-out;
+            }
+            .dot:nth-child(2) { animation-delay: 0.2s; }
+            .dot:nth-child(3) { animation-delay: 0.4s; }
+
+            @keyframes bounce {
+                0%, 80%, 100% { transform: translateY(0); opacity: .6; }
+                40% { transform: translateY(-8px); opacity: 1; }
+            }
+
+            .loading-text {
+                font-size: 14px;
+                color: #475569;
+                user-select: none;
+            }
         </style>
         <div class="custom-loading-overlay">
-            <div class="animation-container"></div>
+            <div class="loader-wrap">
+                <div class="dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <div class="loading-text">영상 분석 중입니다…</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
-# --- [수정] 커스텀 로딩 오버레이 함수 끝 ---
+
 
 # ------------------ 스타일 ------------------
 st.markdown("""
@@ -240,12 +204,12 @@ st.markdown("""
     label[for="memo"] > div:first-child { display: none; }
     .video-title { font-size: 12px; font-weight: 600; line-height: 1.1; margin: 4px 0 6px; }
 
-    /* [수정/재정의] 챕터 목록 비활성화 버튼 스타일 (요청: 회색) */
+    /* 챕터 목록 비활성화 버튼 스타일 (회색) */
     button[disabled][data-testid="baseButton-secondary"]{
         background: #f1f3f5 !important;
         border-color: #e9ecef !important;
         color: #adb5bd !important;
-        opacity: 1; /* 투명도 조절 제거 */
+        opacity: 1;
         cursor: not-allowed !important;
         filter: none !important; 
         transform: none !important;
@@ -253,8 +217,8 @@ st.markdown("""
     button[disabled][data-testid="baseButton-secondary"]:hover{
         filter: none !important; transform: none !important;
     }
-    
-    /* 챕터 목록 버튼 스타일 (선택 가능한 건 흰색) */
+
+    /* 챕터 목록 버튼 스타일 */
     div[data-testid="stColumn"] button[data-testid="baseButton-secondary"] {
         border-color: #ccc;
         background-color: white;
@@ -265,7 +229,7 @@ st.markdown("""
         border-color: #aaa;
     }
 
-    /* 썸네일 카드 컨테이너 */
+    /* 썸네일 카드 */
     .thumb-wrap { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
     .thumb-inner { position: relative; width: 100%; padding-bottom: 50%; background-size: cover; background-position: center; background-repeat: no-repeat; }
     .duration-badge {
@@ -274,12 +238,11 @@ st.markdown("""
         padding: 2px 6px; border-radius: 4px;
         font-size: 12px; font-weight: 600; line-height: 1;
     }
-    div[data-testid="stSelectbox"] > label { display:none; }
 
-    /* 페이지 네비게이션(상단 main / quiz page) 숨김 */
+    /* 페이지 네비게이션 숨김 */
     div[data-testid="stSidebarNav"] { display: none !important; }
 
-    /* ---------- 사이드바 영상 선택: 커스텀 단일 선택 행 ---------- */
+    /* ---------- 사이드바 영상 선택 카드 ---------- */
     [data-testid="stSidebar"] .pick-row {
         border: 1.5px solid transparent;
         border-radius: 10px;
@@ -296,14 +259,11 @@ st.markdown("""
         cursor: default !important;
     }
 
-    /* ---- 부모 컨테이너(스트림릿 내부 div)도 정사각형으로 강제하고 중앙 정렬 ---- */
-    /* 컬럼 안의 첫번째 엘리먼트(버튼을 감싸는 element container)에 적용 */
+    /* ---- 왼쪽 선택 버튼 정사각형 설정 ---- */
     [data-testid="stSidebar"] .pick-row > div:first-child .stElementContainer,
     [data-testid="stSidebar"] .pick-row > div:first-child .element-container {
-        width: 48px !important;
-        height: 48px !important;
-        min-width: 48px !important;
-        min-height: 48px !important; 
+        width: 60px !important;
+        height: 60px !important;
         box-sizing: border-box !important;
         padding: 0 !important;
         margin: 0 !important;
@@ -312,23 +272,19 @@ st.markdown("""
         justify-content: center !important;
     }
 
-    /* [수정] stButton Wrapper에도 사이즈 강제 적용하여 정사각형 크기 고정 */
+    /* 버튼 래퍼도 정사각형으로 */
     [data-testid="stSidebar"] .pick-row > div:first-child .stButton {
-        width: 48px !important;
-        height: 48px !important;
-        min-width: 48px !important;
-        min-height: 48px !important;
+        width: 60px !important;
+        height: 60px !important;
         box-sizing: border-box !important;
         padding: 0 !important;
         margin: 0 !important;
     }
 
-    /* 실제 버튼은 부모를 가득 채우도록 하고 내부 중앙 정렬 (체크 마크 중앙 위치) */
+    /* 실제 버튼 디자인 */
     [data-testid="stSidebar"] .pick-row .stButton > button {
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0 !important;
-        min-height: 0 !important;
+        width: 60px !important;
+        height: 60px !important;
         padding: 0 !important;
         border-radius: 10px !important;
         border: 2px solid #b6b6b6 !important;
@@ -339,17 +295,17 @@ st.markdown("""
         font-size: 20px !important;
         line-height: 1 !important;
         background: white !important;
-        color: transparent !important; /* 기본 상태에서 라벨(✔) 숨김 */
+        color: transparent !important; /* 기본 상태에서 V 숨김 */
     }
 
-    /* 선택된 상태 스타일 */
+    /* 선택된 상태 강조 */
     [data-testid="stSidebar"] .pick-row.selected .stButton > button {
         border-color: #ef9a9a !important;
         background: #fff0f0 !important;
-        color: #111 !important; /* 선택 시 라벨(✔) 보이도록 색상 적용 */
+        color: #111 !important; /* 선택 시 V 표시 */
     }
 
-    /* 왼쪽 컬럼 최소 너비 보장 (버튼 + 여유 공간) */
+    /* 왼쪽 컬럼 최소 너비 */
     [data-testid="stSidebar"] .pick-row .stColumn:first-child {
         min-width: 56px !important;
         padding-right: 8px !important;
@@ -362,23 +318,23 @@ st.markdown("""
 
     /* 포커스 시 outline 제거 */
     [data-testid="stSidebar"] .stButton > button:focus { outline: none !important; box-shadow: none !important; }
-    
-    /* [추가] 선택된 챕터 제목 스타일 (요청에 따라 진하고 큰 글씨로 수정) */
-    .chapter-concept-title { font-size: 21px; font-weight: 600; line-height: 1.2; margin-top: 0px; margin-bottom: 0px; display: flex; align-items: center; height: 100%;}
-    
-    /* [추가] 6단계 버튼 섹션 스타일 */
+
+    /* 챕터 제목 강조 */
+    .chapter-concept-title { font-size: 21px; font-weight: 600; line-height: 1.2; margin-top: 0; margin-bottom: 0; display: flex; align-items: center; height: 100%;}
+
+    /* 블룸 단계 버튼 스타일 */
     .stage-button-style button {
         border-color: #ced4da !important;
         background-color: #f8f9fa !important;
         color: #343a40 !important;
-        margin-bottom: 5px; /* 버튼 사이 간격 (세로 버튼의 기본 마진) */
+        margin-bottom: 5px;
         padding-top: 8px !important;
         padding-bottom: 8px !important;
         font-weight: 500;
         transition: all 0.2s;
     }
     .stage-button-style.selected button {
-        border-color: #007bff !important; /* 선택된 단계 파란색 강조 */
+        border-color: #007bff !important;
         background-color: #e9f5ff !important;
         color: #007bff !important;
         font-weight: bold;
@@ -386,16 +342,17 @@ st.markdown("""
     .stage-button-style button:hover:not([disabled]) {
         background-color: #e2e6ea !important;
     }
-    
-    /* 챕터 목록과 단계 버튼의 간격 조정 */
+
+    /* 챕터 목록과 단계 버튼 간격 */
     .section-title { margin-top: 0px !important; }
-    
-    /* 가로 버튼이므로 하단 여백 제거 */
+
+    /* 가로 버튼 간 여백 제거 */
     div[data-testid="stHorizontalBlock"] .stage-button-style {
         margin-bottom: 0 !important; 
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 
 # ------------------ 상태 초기화 ------------------
@@ -593,11 +550,11 @@ with st.sidebar:
                 st.markdown(f'<div class="{class_name}">', unsafe_allow_html=True)
                 
                 # 왼쪽 버튼 컬럼을 충분히 넓혀 정사각 버튼이 잘 보이도록 조정
-                left, right = st.columns([1.6, 11.4], vertical_alignment="top")
+                left, right = st.columns([2.0, 11.5], vertical_alignment="top")
 
                 # 좌측 '선택' 버튼
                 with left:
-                    label = "✔" if selected else ""
+                    label = "V" if selected else ""
                     if st.button(label, key=f"pick_btn_{i}", help="클릭하여 영상 선택"):
                         st.session_state.video_choice_idx = i
                         st.session_state.selected_bloom_stage = None # 영상 변경 시 필터 초기화
@@ -679,9 +636,12 @@ if st.session_state.is_analyzing:
             
             # 3. 분석 완료 후 상태 업데이트
             st.session_state.processed_video_ids.add(chosen_id)
-            st.session_state.is_analyzing = False 
-            st.success("영상 분석이 완료되었습니다.") # Streamlit의 성공 메시지 (다음 리런 시 보일 수 있음)
-            st.rerun() # 로딩 화면을 치우고 메인 화면으로 이동
+            st.session_state.is_analyzing = False
+            st.session_state.learning_started = True 
+            st.session_state.selected_video_id = chosen_id  
+            st.session_state.selected_video_title = st.session_state.get("selected_video_title", "")
+            st.rerun()  
+
             
         except Exception as e:
             # 3. 분석 실패 시 상태 업데이트
