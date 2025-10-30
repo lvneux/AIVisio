@@ -9,6 +9,7 @@ from pathlib import Path
 from streamlit import components
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from dotenv import load_dotenv
+import base64 # 👈 [추가] Base64 인코딩을 위한 모듈 임포트
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -17,7 +18,7 @@ if str(ROOT_DIR) not in sys.path:
 # .env 파일 로드
 load_dotenv(ROOT_DIR / ".env")
 
-from Backend import main as backend_main  # Backend > main.py 호출
+from Backend import main as backend_main # Backend > main.py 호출
 
 API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
@@ -26,7 +27,7 @@ st.set_page_config(page_title="AIVisio", layout="wide")
 # 선택한 영상 정보를 Backend/output/selected_video.json에 저장
 def save_selected_video(video_id: str, video_title: str | None = None):
     try:
-        root_dir = Path(__file__).resolve().parents[1]  # 프로젝트 루트
+        root_dir = Path(__file__).resolve().parents[1] # 프로젝트 루트
         output_dir = root_dir / "Backend" / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -44,11 +45,39 @@ def save_selected_video(video_id: str, video_title: str | None = None):
 def load_segments(video_id: str | None):
     if not video_id:
         return [], "video_id가 지정되지 않았습니다."
+    
     try:
         root_dir = Path(__file__).resolve().parents[1]
-        json_path = root_dir / "Backend" / "output" / f"{video_id}_segments_with_subtitles_en.json"
+        output_dir = root_dir / "Backend" / "output"
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        # 1. 원본 파일 경로 (e.g., ..._segments_with_subtitles.json)
+        original_path = output_dir / f"{video_id}_segments_with_subtitles.json"
+        
+        json_path_to_load = None
+
+        if original_path.exists():
+            # 1.1. 원본 파일이 있으면 사용
+            json_path_to_load = original_path
+        else:
+            # 2. 원본 파일이 없으면, 언어 코드가 붙은 파일 검색 (e.g., ..._en.json)
+            # 패턴: {video_id}_segments_with_subtitles_*.json
+            pattern = f"{video_id}_segments_with_subtitles_*.json"
+            
+            # output 디렉토리에서 패턴에 맞는 파일 검색
+            found_files = list(output_dir.glob(pattern))
+            
+            if found_files:
+                # 2.1. 찾았으면 첫 번째 파일 사용
+                json_path_to_load = found_files[0]
+            else:
+                # 3. 두 경우 모두 실패하면 에러 발생
+                raise FileNotFoundError(
+                    f"'{original_path.name}' 파일을 찾을 수 없습니다. "
+                    f"또한 '{pattern}' 패턴의 파일도 찾을 수 없습니다."
+                )
+
+        # 찾은 파일 로드
+        with open(json_path_to_load, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         items = []
@@ -79,12 +108,15 @@ def load_segments(video_id: str | None):
             summary = it.get("summary")
             s_sec = parse_timecode(it.get("start_time_formatted"))
             e_sec = parse_timecode(it.get("end_time_formatted"))
+            # [수정] bloom_category 필드 추가
+            bloom_category = it.get("bloom_category")
             if title is not None:
                 cleaned.append({
                     "title": str(title),
                     "summary": summary,
                     "start_sec": s_sec,
-                    "end_sec": e_sec
+                    "end_sec": e_sec,
+                    "bloom_category": bloom_category # <-- ADDED
                 })
 
         return cleaned, None
@@ -102,31 +134,140 @@ def unique_preserve_order(seq):
             out.append(x)
     return out
 
+# --- [수정] 커스텀 로딩 오버레이 함수 (Base64 인코딩 적용) ---
+def display_loading_overlay():
+    # 이미지 파일 순서: 맨 앞 사진부터 5개 순서대로
+    image_files = [
+        "img_1.png",
+        "img_2.png",
+        "img_3.png",
+        "img_4.png",
+        "img_5.png",
+    ]
+    
+    # 이미지 파일 경로 (Frontend/assets/ 하위에 파일이 있어야 함)
+    # Streamlit 앱 파일 (main.py)이 Frontend에 있으므로 Path(__file__).parent 사용
+    asset_dir = Path(__file__).parent / "assets"
+    
+    # --- CSS Keyframes Generation ---
+    keyframes = []
+    num_frames = len(image_files)
+    duration_per_frame_sec = 1.5
+    total_duration_sec = num_frames * duration_per_frame_sec # 7.5s (5장 * 1.5초)
+    duration_percent_step = 100 / num_frames # 20%
+
+    for i, file_name in enumerate(image_files):
+        img_path = asset_dir / file_name
+        img_data_url = ""
+        
+        # 파일이 존재하는지 확인하고 Base64로 인코딩
+        if img_path.exists():
+            with open(img_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+                # Data URL 형식: 'data:[<MIME-type>][;charset=<encoding>][;base64],<data>'
+                img_data_url = f"data:image/png;base64,{encoded}"
+        else:
+            # 파일이 없을 경우 경고 메시지를 로그에 출력하거나 대체 이미지 사용
+            st.warning(f"로딩 이미지 파일을 찾을 수 없습니다: {img_path}")
+            continue # 해당 프레임은 건너뜀
+
+        # 시작 퍼센트 (e.g., 0%, 20%, 40%, ...)
+        start_percent = i * duration_percent_step
+        # 끝 퍼센트 (다음 프레임 직전)
+        end_percent = (i + 1) * duration_percent_step - 0.001 
+        
+        keyframes.append(f"""
+        {start_percent:.1f}% {{ background-image: url('{img_data_url}'); }}
+        {end_percent:.1f}% {{ background-image: url('{img_data_url}'); }}
+        """)
+    
+    keyframes_css = "\n".join(keyframes)
+    
+    if not keyframes_css:
+        # 이미지를 하나도 로드하지 못했을 경우 (파일이 없거나 경로 문제)
+        st.error("로딩 화면용 이미지를 로드할 수 없습니다. 'Frontend/assets' 폴더에 파일이 있는지 확인하세요.")
+        return
+        
+    # --- HTML/CSS Injection ---
+    st.markdown(
+        f"""
+        <style>
+            /* 로딩 오버레이 */
+            .custom-loading-overlay {{
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-color: white; /* 흰색 배경 */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999; /* 최상위 레이어 */
+                
+                /* Streamlit의 메인 컨텐츠 위에 확실히 덮도록 마진/패딩 제거 */
+                margin: 0; padding: 0;
+                width: 100%; height: 100%;
+            }}
+            
+            /* 애니메이션 컨테이너 (창 크기에 맞게) */
+            .animation-container {{
+                width: 80vw; 
+                height: 80vh;
+                background-repeat: no-repeat;
+                background-position: center center;
+                background-size: contain; /* 이미지 전체가 보이도록 크기 조정 (가운데 로고 등 유지) */
+                
+                /* 배경 이미지 애니메이션 */
+                animation: image-sequence {total_duration_sec}s infinite steps(1); 
+            }}
+            
+            @keyframes image-sequence {{
+                {keyframes_css}
+            }}
+            
+        </style>
+        <div class="custom-loading-overlay">
+            <div class="animation-container"></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+# --- [수정] 커스텀 로딩 오버레이 함수 끝 ---
+
 # ------------------ 스타일 ------------------
 st.markdown("""
     <style>
-    .logo-box { background-color: #fff9d6; border-radius: 10px; padding: 10px 20px; margin: 0px; position: absolute; top: 10px; left: 10px; }
-    .logo-text { font-family: 'Trebuchet MS', sans-serif; font-size: 26px; font-weight: bold; color: #333; }
+    /* 기본 UI 스타일 */
     .section-title { font-size: 20px !important; font-weight: 600; margin-bottom: 8px; }
-    .chapter-box { padding: 10px; background-color: #f0f2f6; border-radius: 10px; margin-bottom: 5px; font-size: 14px; }
-    .dropdown-adjust { padding-top: 38px; }
     label[for="memo"] > div:first-child { display: none; }
-    .video-title { font-size: 13px; font-weight: 600; line-height: 1.2; margin: 4px 0 8px; }
+    .video-title { font-size: 12px; font-weight: 600; line-height: 1.1; margin: 4px 0 6px; }
 
+    /* [수정/재정의] 챕터 목록 비활성화 버튼 스타일 (요청: 회색) */
     button[disabled][data-testid="baseButton-secondary"]{
-      background: #e5e7eb !important;
-      border-color: #d1d5db !important;
-      color: #6b7280 !important;
-      opacity: 0.85;
-      cursor: not-allowed !important;
+        background: #f1f3f5 !important;
+        border-color: #e9ecef !important;
+        color: #adb5bd !important;
+        opacity: 1; /* 투명도 조절 제거 */
+        cursor: not-allowed !important;
+        filter: none !important; 
+        transform: none !important;
     }
     button[disabled][data-testid="baseButton-secondary"]:hover{
-      filter: none !important; transform: none !important;
+        filter: none !important; transform: none !important;
+    }
+    
+    /* 챕터 목록 버튼 스타일 (선택 가능한 건 흰색) */
+    div[data-testid="stColumn"] button[data-testid="baseButton-secondary"] {
+        border-color: #ccc;
+        background-color: white;
+        color: #333;
+    }
+    div[data-testid="stColumn"] button[data-testid="baseButton-secondary"]:hover:not([disabled]) {
+        background-color: #f0f0f0;
+        border-color: #aaa;
     }
 
     /* 썸네일 카드 컨테이너 */
     .thumb-wrap { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
-    .thumb-inner { position: relative; width: 100%; padding-bottom: 56.25%; background-size: cover; background-position: center; background-repeat: no-repeat; }
+    .thumb-inner { position: relative; width: 100%; padding-bottom: 50%; background-size: cover; background-position: center; background-repeat: no-repeat; }
     .duration-badge {
         position: absolute; right: 6px; bottom: 6px;
         background: rgba(0,0,0,0.75); color: #fff;
@@ -135,6 +276,9 @@ st.markdown("""
     }
     div[data-testid="stSelectbox"] > label { display:none; }
 
+    /* 페이지 네비게이션(상단 main / quiz page) 숨김 */
+    div[data-testid="stSidebarNav"] { display: none !important; }
+
     /* ---------- 사이드바 영상 선택: 커스텀 단일 선택 행 ---------- */
     [data-testid="stSidebar"] .pick-row {
         border: 1.5px solid transparent;
@@ -142,43 +286,117 @@ st.markdown("""
         padding: 8px 10px;
         margin-bottom: 10px;
         background: transparent;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     [data-testid="stSidebar"] .pick-row:hover {
         border-color: transparent !important;
         background: transparent !important;
         cursor: default !important;
     }
-    /* 좌측 버튼(선택 표시) */
+
+    /* ---- 부모 컨테이너(스트림릿 내부 div)도 정사각형으로 강제하고 중앙 정렬 ---- */
+    /* 컬럼 안의 첫번째 엘리먼트(버튼을 감싸는 element container)에 적용 */
+    [data-testid="stSidebar"] .pick-row > div:first-child .stElementContainer,
+    [data-testid="stSidebar"] .pick-row > div:first-child .element-container {
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        min-height: 48px !important; 
+        box-sizing: border-box !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* [수정] stButton Wrapper에도 사이즈 강제 적용하여 정사각형 크기 고정 */
+    [data-testid="stSidebar"] .pick-row > div:first-child .stButton {
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        min-height: 48px !important;
+        box-sizing: border-box !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* 실제 버튼은 부모를 가득 채우도록 하고 내부 중앙 정렬 (체크 마크 중앙 위치) */
     [data-testid="stSidebar"] .pick-row .stButton > button {
-        width: 36px; height: 36px; min-width: 36px;
-        padding: 0;
-        border-radius: 4px;
-        line-height: 1;
-        font-weight: 700;
-        border: 2px solid #b6b6b6;
-        background: white;
-        color: transparent;
-        display: flex; justify-content: center; align-items: center;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        border-radius: 10px !important;
+        border: 2px solid #b6b6b6 !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 20px !important;
+        line-height: 1 !important;
+        background: white !important;
+        color: transparent !important; /* 기본 상태에서 라벨(✔) 숨김 */
     }
-    [data-testid="stSidebar"] .pick-row .stButton > button.selected-button {
-        border-color: #3b82f6;
-        background: #3b82f6;
-        color: white;
+
+    /* 선택된 상태 스타일 */
+    [data-testid="stSidebar"] .pick-row.selected .stButton > button {
+        border-color: #ef9a9a !important;
+        background: #fff0f0 !important;
+        color: #111 !important; /* 선택 시 라벨(✔) 보이도록 색상 적용 */
     }
-    [data-testid="stSidebar"] .pick-row .stButton > button:hover {
-        filter: none !important; transform: none !important;
-        background: inherit; border-color: inherit; color: inherit;
+
+    /* 왼쪽 컬럼 최소 너비 보장 (버튼 + 여유 공간) */
+    [data-testid="stSidebar"] .pick-row .stColumn:first-child {
+        min-width: 56px !important;
+        padding-right: 8px !important;
+        box-sizing: border-box !important;
     }
-    /* 썸네일 간격 */
-    [data-testid="stSidebar"] .pick-row .stColumn:first-child { padding-right: 15px; }
+
     /* 학습 시작 버튼 중앙 정렬 */
     .center-wrap { display: flex; justify-content: center; margin-top: 20px; }
     .center-wrap button { width: auto; padding: 10px 20px; font-size: 16px; }
+
+    /* 포커스 시 outline 제거 */
+    [data-testid="stSidebar"] .stButton > button:focus { outline: none !important; box-shadow: none !important; }
+    
+    /* [추가] 선택된 챕터 제목 스타일 (요청에 따라 진하고 큰 글씨로 수정) */
+    .chapter-concept-title { font-size: 21px; font-weight: 600; line-height: 1.2; margin-top: 0px; margin-bottom: 0px; display: flex; align-items: center; height: 100%;}
+    
+    /* [추가] 6단계 버튼 섹션 스타일 */
+    .stage-button-style button {
+        border-color: #ced4da !important;
+        background-color: #f8f9fa !important;
+        color: #343a40 !important;
+        margin-bottom: 5px; /* 버튼 사이 간격 (세로 버튼의 기본 마진) */
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .stage-button-style.selected button {
+        border-color: #007bff !important; /* 선택된 단계 파란색 강조 */
+        background-color: #e9f5ff !important;
+        color: #007bff !important;
+        font-weight: bold;
+    }
+    .stage-button-style button:hover:not([disabled]) {
+        background-color: #e2e6ea !important;
+    }
+    
+    /* 챕터 목록과 단계 버튼의 간격 조정 */
+    .section-title { margin-top: 0px !important; }
+    
+    /* 가로 버튼이므로 하단 여백 제거 */
+    div[data-testid="stHorizontalBlock"] .stage-button-style {
+        margin-bottom: 0 !important; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="logo-box"><div class="logo-text">AIVisio</div></div>', unsafe_allow_html=True)
-st.markdown("<br><br><br>", unsafe_allow_html=True)
 
 # ------------------ 상태 초기화 ------------------
 if "selected_title" not in st.session_state:
@@ -198,6 +416,13 @@ if "processed_video_ids" not in st.session_state:
 # (추가) 사이드바 단일 선택 인덱스 상태
 if "video_choice_idx" not in st.session_state:
     st.session_state.video_choice_idx = 0
+# [추가] 선택된 블룸 단계 상태
+if "selected_bloom_stage" not in st.session_state:
+    st.session_state.selected_bloom_stage = None # "기억", "이해", "적용", "분석", "평가", "창조"
+# [추가] 영상 분석 중 상태
+if "is_analyzing" not in st.session_state:
+    st.session_state.is_analyzing = False
+
 
 # YouTube API/썸네일 유틸
 def yt_thumb(id_: str, quality: str = "hqdefault"):
@@ -255,10 +480,10 @@ def has_pref_transcript(video_id: str) -> bool:
         has_manual_en = False
 
         for t in tl:
-            if not t.is_generated:  # 반드시 수동 자막만
+            if not t.is_generated: # 반드시 수동 자막만
                 if t.language_code.startswith("ko"):
                     has_manual_ko = True
-                    break  # 한국어 수동 자막 있으면 바로 True 반환
+                    break # 한국어 수동 자막 있으면 바로 True 반환
                 elif t.language_code.startswith("en"):
                     has_manual_en = True
 
@@ -347,7 +572,7 @@ with st.sidebar:
 
     try:
         vids = fetch_top_videos(subject)
-        st.caption("학습할 **영상 1개**를 선택하세요. (단일 선택)")
+        st.caption("학습할 영상 1개를 선택하세요.")
 
         if not vids:
             st.error("자막 기준(한국어 우선, 없으면 영어 / 자동 생성 제외)에 맞는 영상이 없습니다.")
@@ -359,25 +584,25 @@ with st.sidebar:
 
             # 각 항목을 카드형으로 렌더링 (버튼+썸네일+제목)
             for i, v in enumerate(vids):
-                st.markdown('<div class="pick-row">', unsafe_allow_html=True)
-                left, right = st.columns([1, 12], vertical_alignment="top")
-
+                
+                # selected 상태를 먼저 파악
                 selected = (i == st.session_state.video_choice_idx)
+                
+                # div에 .selected 클래스 동적 할당
+                class_name = "pick-row selected" if selected else "pick-row"
+                st.markdown(f'<div class="{class_name}">', unsafe_allow_html=True)
+                
+                # 왼쪽 버튼 컬럼을 충분히 넓혀 정사각 버튼이 잘 보이도록 조정
+                left, right = st.columns([1.6, 11.4], vertical_alignment="top")
+
                 # 좌측 '선택' 버튼
                 with left:
                     label = "✔" if selected else ""
                     if st.button(label, key=f"pick_btn_{i}", help="클릭하여 영상 선택"):
                         st.session_state.video_choice_idx = i
+                        st.session_state.selected_bloom_stage = None # 영상 변경 시 필터 초기화
                         st.rerun()
-                    # 선택된 경우 버튼 컬러 채우기
-                    if selected:
-                        st.markdown(
-                            "<style>"
-                            "div[data-testid='stSidebar'] .pick-row .stButton > button {"
-                            "border-color:#3b82f6;background:#3b82f6;color:#ffffff;}"
-                            "</style>", unsafe_allow_html=True
-                        )
-
+                
                 # 우측 썸네일 + 제목
                 with right:
                     st.markdown(
@@ -409,52 +634,162 @@ with st.sidebar:
             save_selected_video(chosen_id, chosen_title)
 
             if chosen_id not in st.session_state.processed_video_ids:
-                with st.spinner("선택한 영상 분석(Backend) 실행 중..."):
-                    try:
-                        backend_main.main(video_id=chosen_id)
-                        st.session_state.processed_video_ids.add(chosen_id)
-                        st.success("영상 분석이 완료되었습니다.")
-                    except Exception as e:
-                        st.error(f"Backend.main 실행 중 오류: {e}")
+                # [수정] st.spinner 대신 커스텀 로딩 화면을 띄우기 위해 상태 변경 후 재실행
+                st.session_state.is_analyzing = True
+                st.rerun() # 재실행하여 로딩 화면을 먼저 띄우고 분석 시작
 
+            # 분석이 이미 완료되었거나, 새로 시작할 경우 학습 시작 상태로 전환
             st.session_state.learning_started = True
+            # 이미 처리된 영상이면, 메인 화면으로 전환
+            if chosen_id in st.session_state.processed_video_ids:
+                st.rerun()
         else:
             st.error("영상을 먼저 선택해주세요.")
+            
+# --- [추가] 영상 분석 로직 (is_analyzing 상태에서만 실행) ---
+# 이 블록은 로딩 화면을 띄운 상태에서 블로킹 작업을 수행합니다.
+if st.session_state.is_analyzing:
+    # 1. 로딩 오버레이 표시 (애니메이션이 시작됨)
+    display_loading_overlay() 
+    
+    chosen_id = st.session_state.selected_video_id
+    
+    # 선택된 영상 ID가 있고, 아직 처리되지 않은 경우에만 분석 실행
+    if chosen_id and chosen_id not in st.session_state.processed_video_ids:
+        try:
+            # 2. blocking task 실행 (이 동안 브라우저는 CSS 애니메이션 표시)
+            # st.info("영상 분석 중입니다. 잠시만 기다려 주세요...") # 이 메시지를 추가하면 디버깅에 도움이 될 수 있습니다.
+            backend_main.main(video_id=chosen_id) 
+            
+            # 3. 분석 완료 후 상태 업데이트
+            st.session_state.processed_video_ids.add(chosen_id)
+            st.session_state.is_analyzing = False 
+            st.success("영상 분석이 완료되었습니다.") # Streamlit의 성공 메시지 (다음 리런 시 보일 수 있음)
+            st.rerun() # 로딩 화면을 치우고 메인 화면으로 이동
+            
+        except Exception as e:
+            # 3. 분석 실패 시 상태 업데이트
+            st.session_state.is_analyzing = False
+            st.session_state.learning_started = False
+            st.error(f"Backend.main 실행 중 오류: {e}")
+            st.stop() # 에러 발생 시 재실행 방지
+    else:
+        # chosen_id가 없거나 이미 처리된 경우 (예외 상황 대비)
+        st.session_state.is_analyzing = False
+        st.rerun()
+
 
 # ------------------ 메인 화면 ------------------
-# 영상 선택
+# [수정] 영상 선택 / 분석 중 상태 확인
+if st.session_state.is_analyzing:
+    # 분석 중일 때는 메인 화면 렌더링을 중단
+    st.stop()
+    
 if not st.session_state.learning_started:
-    st.info("👈 좌측 **사이드바**에서 주제를 고르고 영상 1개를 선택한 뒤 **[학습 시작]**을 눌러주세요.")
-    if st.session_state.selected_video_id:
-        st.markdown("### 선택 예정 영상 미리보기")
-        render_video(st.session_state.selected_video_id, height=420)
+    st.info("좌측 사이드바에서 주제를 고르고 영상 1개를 선택한 뒤 [학습 시작]을 눌러주세요.")
+    # '선택 예정 영상 미리보기' 화면과 관련된 코드를 주석 처리하여 제거함 (요청 사항 반영)
+    # if st.session_state.selected_video_id:
+    #     st.markdown("선택 예정 영상 미리보기")
+    #     render_video(st.session_state.selected_video_id, height=420)
     st.stop()
     
 segments, load_err = load_segments(st.session_state.selected_video_id)
+# 챕터 제목은 중복 제거 후 순서 유지
 titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
+# 챕터 제목별 Bloom category 매핑 (첫 번째 세그먼트를 대표로 사용)
+title_to_bloom = {
+    item["title"]: item["bloom_category"]
+    for item in segments
+    if item.get("bloom_category") is not None
+}
+
+
+# [수정] 블룸 인지 단계 버튼 위에 '학습 단계' 제목 추가
+st.markdown('<div class="section-title" style="margin-bottom: 5px;">학습 단계</div>', unsafe_allow_html=True)
+
+# [수정] 블룸 인지 단계 버튼을 챕터 목록 위에 가로로 나열
+bloom_stages = [
+    ("1단계: 기억", "기억"),
+    ("2단계: 이해", "이해"),
+    ("3단계: 적용", "적용"),
+    ("4단계: 분석", "분석"),
+    ("5단계: 평가", "평가"),
+    ("6단계: 창조", "창조")
+]
+
+# 6개의 컬럼을 생성하여 버튼을 가로로 나열
+cols_bloom = st.columns(6) 
+for i, (full_text, category_name) in enumerate(bloom_stages):
+    is_selected = st.session_state.selected_bloom_stage == category_name
+    btn_key = f"bloom_btn_horizontal_{category_name}"
+    
+    with cols_bloom[i]:
+        # 커스텀 스타일 적용을 위한 HTML 래퍼 (기존 스타일 패턴 유지)
+        class_name = "stage-button-style selected" if is_selected else "stage-button-style"
+        st.markdown(f'<div class="{class_name}" id="wrap_{btn_key}">', unsafe_allow_html=True)
+        
+        # Streamlit 버튼 생성
+        if st.button(full_text, key=btn_key, use_container_width=True):
+            # 선택된 버튼을 다시 누르면 초기화 (None으로 돌아감)
+            st.session_state.selected_bloom_stage = category_name if not is_selected else None
+            st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True) # HTML 래퍼 닫기
+
+st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True) # 추가적인 간격 조정 (없애면 딱 붙음)
+st.markdown("---") 
 
 # 기존 main 페이지
 col1, col2, col3 = st.columns([1.5, 3.5, 2])
 
 with col1:
-    st.markdown('<div class="section-title" style="margin-top: 20px;">챕터 목록</div>', unsafe_allow_html=True)
+    # 1. 챕터 목록 
+    st.markdown('<div class="section-title">챕터 목록</div>', unsafe_allow_html=True)
     if load_err:
         st.error(load_err)
     elif not titles:
         st.warning("표시할 챕터가 없습니다.")
     else:
         completed_set = set(st.session_state.completed_chapters)
+        
+        # [추가] Bloom filter 적용
+        filtered_titles = []
+        target_bloom = st.session_state.selected_bloom_stage
+        
+        for t in titles:
+            bloom_cat = title_to_bloom.get(t)
+            # 1) 필터가 선택되지 않았거나 (None)
+            # 2) 챕터에 bloom_category 정보가 없거나
+            # 3) 챕터의 bloom_category가 선택된 필터와 일치하면 포함
+            if target_bloom is None or bloom_cat is None or bloom_cat == target_bloom:
+                 filtered_titles.append(t)
+        
+        # 챕터 버튼 렌더링
         for i, t in enumerate(titles):
             completed = t in completed_set
-            if st.button(f"📌 {t}", key=f"chapter_btn_{i}", use_container_width=True, disabled=completed):
-                st.session_state.selected_title = t
-                st.rerun()
+            
+            # [수정] 필터링: 선택된 필터(target_bloom)와 챕터의 카테고리가 일치하는 경우만 활성화
+            bloom_cat = title_to_bloom.get(t)
+            
+            # 필터가 선택되었고, 챕터의 카테고리가 필터와 일치하지 않으면 비활성화
+            # 다만, 완료된 챕터는 필터와 관계없이 비활성화
+            is_filtered_out = target_bloom is not None and bloom_cat != target_bloom
+            disabled = completed or is_filtered_out
+            
+            
+            if st.button(f"▶ {t}", key=f"chapter_btn_{i}", use_container_width=True, disabled=disabled):
+                # 활성화된 버튼만 클릭 이벤트 발생 (disabled=False)
+                if not disabled:
+                    st.session_state.selected_title = t
+                    st.rerun()
+
 
 with col2:
     st.markdown('<div class="section-title">추천 교육 영상</div>', unsafe_allow_html=True)
 
     seg_to_play = None
     if st.session_state.selected_title:
+        # 선택된 챕터의 세그먼트를 찾음
         for c in (it for it in segments if it.get("title") == st.session_state.selected_title):
             if c.get("start_sec") is not None and c.get("end_sec") is not None:
                 seg_to_play = c
@@ -468,6 +803,7 @@ with col2:
             height=480
         )
     else:
+        # 선택된 챕터가 없으면 전체 영상 재생
         render_video(video_id=st.session_state.selected_video_id, height=480)
 
     st.markdown("---")
@@ -480,25 +816,29 @@ with col2:
         if summaries:
             for idx, s in enumerate(summaries, start=1):
                 with st.expander("요약 보기", expanded=(len(summaries) == 1)):
-                    st.markdown(s.replace("\n", "  \n"))
+                    st.markdown(s.replace("\n", " \n"))
         else:
-            st.warning("해당 챕터에 summary가 없습니다.")
+            st.warning("해당 챕터에 요약 내용이 없습니다.")
     else:
-        st.info("좌측에서 챕터를 선택하면 summary가 표시됩니다.")
+        # [수정] 텍스트 변경
+        st.info("단계별로 학습하세요. 챕터를 선택하면 관련 퀴즈를 풀 수 있습니다.")
         
     st.markdown("---")
-    st.markdown('<div class="section-title">주요 개념 학습</div>', unsafe_allow_html=True)
 
     key_concepts = [st.session_state.selected_title] if st.session_state.selected_title else []
     for concept in key_concepts:
-        # ▼ 버튼 영역만 살짝 넓혀 한 줄 표시가 되도록 조정
-        col_concept, col_button = st.columns([4, 1.6])
-        col_concept.markdown(f"- {concept}", unsafe_allow_html=True)
+        
+        col_concept, col_button = st.columns([4, 1.6], vertical_alignment="center")
+
+        col_concept.markdown(f'<div class="chapter-concept-title">• {concept}</div>', unsafe_allow_html=True)
+        
         if col_button.button("관련 문제 풀기", key=f"concept_quiz_{concept}", use_container_width=True):
             st.session_state.quiz_title = concept
+            # 퀴즈 페이지로 이동 로직
             try:
                 st.switch_page("pages/quiz_page.py")
             except Exception:
+                # switch_page가 없을 경우 쿼리 파라미터로 대체 (Streamlit 버전 호환성)
                 st.experimental_set_query_params(quiz_title=concept)
                 st.rerun()
 
@@ -508,7 +848,13 @@ with col3:
 
     st.markdown('<div class="section-title">💾 메모 저장</div>', unsafe_allow_html=True)
     filename = st.text_input("저장 파일명 (확장자 제외)", value=f"memo_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    file_format = st.radio("파일 형식 선택", ["txt", "pdf"])
+    
+    # PDF를 제거하고 워드 파일(.doc) 옵션 추가
+    file_format = st.radio(
+        "파일 형식 선택", 
+        ["txt", "doc"], 
+        format_func=lambda x: "워드 파일 (*.doc)" if x == "doc" else "텍스트 파일 (*.txt)"
+    )
 
     if st.button("저장하기"):
         if memo_text.strip() == "":
@@ -516,18 +862,30 @@ with col3:
         else:
             if file_format == "txt":
                 filepath = f"{filename}.txt"
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(memo_text)
-                with open(filepath, "rb") as f:
-                    st.download_button("📥 메모 파일 다운로드", f, file_name=filepath)
-            elif file_format == "pdf":
-                from fpdf import FPDF
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", size=12)
-                for line in memo_text.split("\n"):
-                    pdf.cell(200, 10, txt=line, ln=True)
-                filepath = f"{filename}.pdf"
-                pdf.output(filepath)
-                with open(filepath, "rb") as f:
-                    st.download_button("📥 메모 파일 다운로드", f, file_name=filepath)
+                mime_type = "text/plain"
+            elif file_format == "doc":
+                # 워드 파일 (.doc)로 저장 (단순 텍스트를 .doc으로 저장하여 Word에서 열리도록 함)
+                filepath = f"{filename}.doc"
+                mime_type = "application/msword"
+            
+            # 파일 저장
+            try:
+                # Streamlit 환경에서는 파일을 로컬에 쓰는 대신, 바로 다운로드 스트림에 제공하는 것이 일반적
+                # 하지만, 원본 코드가 로컬 파일 저장을 시도하므로, 해당 로직을 유지하고 다운로드 버튼으로 연결
+                
+                # 메모리에서 인코딩
+                if file_format == "txt":
+                    data_to_download = memo_text.encode("utf-8")
+                elif file_format == "doc":
+                    # .doc 포맷은 복잡하지만, 여기서는 단순 텍스트를 .doc으로 저장하는 원본 로직을 따름
+                    data_to_download = memo_text.encode("utf-8")
+                    
+                st.download_button(
+                    "📥 메모 파일 다운로드",
+                    data=data_to_download,
+                    file_name=filepath,
+                    mime=mime_type
+                )
+                st.success("메모 파일이 준비되었습니다. 다운로드 버튼을 눌러주세요.")
+            except Exception as e:
+                st.error(f"파일 처리 중 오류: {e}")
