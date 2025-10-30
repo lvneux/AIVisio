@@ -193,8 +193,13 @@ context_text = build_context_from_segments(segments, quiz_title)
 
 # 요약 내용: 사용자가 원할 때만 보이도록 st.expander 사용
 if context_text:
+    html_summary = context_text.replace("\n", "<br>")
     with st.expander("해당 챕터의 요약 내용 (답을 모를 시 열어보세요.)"):
-        st.markdown(f"<div class='summary-text'><p>{context_text.replace('\n', '<br>')}</p></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='summary-text'><p>{html_summary}</p></div>",
+            unsafe_allow_html=True
+        )
+
 else:
     # 요약 내용이 없을 경우의 메시지
     st.caption("해당 챕터의 summary가 없어 기본 지식으로 퀴즈를 생성합니다.")
@@ -307,7 +312,7 @@ for idx, q in enumerate(quizzes):
         with col_ans:
             # '정답을 입력하세요:' 텍스트 삭제 및 빈 공간 채우기
             states[idx]["answer"] = st.text_input(
-                "", # 라벨을 빈 문자열로 설정
+                "정답 입력",
                 key=f"q_{idx}_text",
                 placeholder="정답 입력",
                 label_visibility="collapsed", # 라벨 공간을 완전히 없앰
