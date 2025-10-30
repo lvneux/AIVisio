@@ -5,13 +5,21 @@ import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from openai import OpenAI
+try:
+    from openai import OpenAI  # optional dependency
+except Exception:
+    OpenAI = None
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("quiz")
 
-OPENAI_API_KEY = ""
-_client = OpenAI(api_key=OPENAI_API_KEY)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+_client = None
+if OpenAI and OPENAI_API_KEY:
+    try:
+        _client = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception:
+        _client = None
 
 MODEL_FOR_GEN = "gpt-4o-mini"
 MODEL_FOR_JUDGE = "gpt-4o-mini"
@@ -49,8 +57,8 @@ def generate_quizzes(chapter_title: str, context_text: str) -> List[Dict[str, An
     Returns: List[{"type": "short", "question": str, "answer": str}] (length 3)
     """
     try:
-        if not OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY is not set in environment.")
+        if not (_client and OPENAI_API_KEY):
+            raise RuntimeError("OpenAI 클라이언트가 비활성화됨(패키지 미설치 또는 API 키 없음).")
 
         msgs = _build_gen_prompt(chapter_title, context_text)
 
@@ -138,6 +146,8 @@ def check_answer(quiz: Dict[str, Any], user_answer: str) -> Dict[str, Any]:
             return {"correct": True, "feedback": ""}
 
     try:
+        if not (_client and OPENAI_API_KEY):
+            raise RuntimeError("OpenAI 클라이언트가 비활성화됨(패키지 미설치 또는 API 키 없음).")
         judge_system = (
             "당신은 매우 엄격한 단답형 채점자입니다. "
             "질문, 정답(ground truth), 사용자 답안을 보고 정답 여부를 판단하세요. "
