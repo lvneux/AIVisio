@@ -634,9 +634,17 @@ with st.sidebar:
             save_selected_video(chosen_id, chosen_title)
 
             if chosen_id not in st.session_state.processed_video_ids:
-                # [수정] st.spinner 대신 커스텀 로딩 화면을 띄우기 위해 상태 변경 후 재실행
-                st.session_state.is_analyzing = True
-                st.rerun() # 재실행하여 로딩 화면을 먼저 띄우고 분석 시작
+                # 기존 분석 결과 파일이 있으면 스킵 (원본 또는 언어 변형 파일)
+                output_dir = ROOT_DIR / "Backend" / "output"
+                base_file = output_dir / f"{chosen_id}_segments_with_subtitles.json"
+                pattern_files = list(output_dir.glob(f"{chosen_id}_segments_with_subtitles_*.json"))
+                if base_file.exists() or len(pattern_files) > 0:
+                    st.info("이미 분석된 영상입니다. 기존 결과를 사용합니다.")
+                    st.session_state.processed_video_ids.add(chosen_id)
+                else:
+                    # 커스텀 로딩 화면을 띄우기 위해 상태 변경 후 재실행
+                    st.session_state.is_analyzing = True
+                    st.rerun() # 재실행하여 로딩 화면을 먼저 띄우고 분석 시작
 
             # 분석이 이미 완료되었거나, 새로 시작할 경우 학습 시작 상태로 전환
             st.session_state.learning_started = True
@@ -656,6 +664,14 @@ if st.session_state.is_analyzing:
     
     # 선택된 영상 ID가 있고, 아직 처리되지 않은 경우에만 분석 실행
     if chosen_id and chosen_id not in st.session_state.processed_video_ids:
+        # 재확인: 결과 파일 존재 시 즉시 스킵
+        output_dir = ROOT_DIR / "Backend" / "output"
+        base_file = output_dir / f"{chosen_id}_segments_with_subtitles.json"
+        pattern_files = list(output_dir.glob(f"{chosen_id}_segments_with_subtitles_*.json"))
+        if base_file.exists() or len(pattern_files) > 0:
+            st.session_state.processed_video_ids.add(chosen_id)
+            st.session_state.is_analyzing = False
+            st.rerun()
         try:
             # 2. blocking task 실행 (이 동안 브라우저는 CSS 애니메이션 표시)
             # st.info("영상 분석 중입니다. 잠시만 기다려 주세요...") # 이 메시지를 추가하면 디버깅에 도움이 될 수 있습니다.
@@ -808,15 +824,32 @@ with col2:
 
     st.markdown("---")
     if st.session_state.selected_title:
-        summaries = [
-            it.get("summary", "")
-            for it in segments
+        # 선택된 챕터의 세그먼트들(요약 포함)을 가져오면서 블룸 단계 표시
+        matched_segments = [
+            it for it in segments
             if it.get("title") == st.session_state.selected_title and it.get("summary")
         ]
-        if summaries:
-            for idx, s in enumerate(summaries, start=1):
-                with st.expander("요약 보기", expanded=(len(summaries) == 1)):
-                    st.markdown(s.replace("\n", " \n"))
+        if matched_segments:
+            # 영어/철자 변형 → (단계번호, 한국어라벨) 매핑
+            bloom_map = {
+                "Remember": (1, "기억"),
+                "Understand": (2, "이해"),
+                "Apply": (3, "적용"),
+                "Analyse": (4, "분석"),
+                "Analyze": (4, "분석"),
+                "Evaluate": (5, "평가"),
+                "Create": (6, "창조"),
+            }
+            for idx, it in enumerate(matched_segments, start=1):
+                cat = (it.get("bloom_category") or "").strip()
+                stage, ko_label = bloom_map.get(cat, (None, None))
+                exp_label = "요약 보기"
+                if stage and ko_label:
+                    exp_label = f"요약 보기 (블룸 단계 {stage}: {ko_label})"
+                elif cat:
+                    exp_label = f"요약 보기 (블룸: {cat})"
+                with st.expander(exp_label, expanded=(len(matched_segments) == 1)):
+                    st.markdown(str(it.get("summary", "")).replace("\n", " \n"))
         else:
             st.warning("해당 챕터에 요약 내용이 없습니다.")
     else:
