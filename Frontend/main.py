@@ -46,7 +46,7 @@ def load_segments(video_id: str | None):
         return [], "video_id가 지정되지 않았습니다."
     try:
         root_dir = Path(__file__).resolve().parents[1]
-        json_path = root_dir / "Backend" / "output" / f"{video_id}_segments_with_subtitles.json"
+        json_path = root_dir / "Backend" / "output" / f"{video_id}_segments_with_subtitles_en.json"
 
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
