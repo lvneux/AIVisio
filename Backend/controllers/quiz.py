@@ -4,6 +4,9 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
+
 
 try:
     from openai import OpenAI  # optional dependency
@@ -34,6 +37,7 @@ def _build_gen_prompt(chapter_title: str, context_text: str) -> List[Dict[str, s
         'JSON 형식: {"quizzes": [{"type": "short", "question": "...", "answer": "..."}]} '
         "항상 3개의 문항만 생성하세요. 질문은 간결하고 모호하지 않게 작성하세요. "
         "반드시 제공된 요약(Context)에 기반하여 질문을 생성하세요."
+        "반드시 한국어로 질문을 생성하세요."
     )
 
     user_msg = (

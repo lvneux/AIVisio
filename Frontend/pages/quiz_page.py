@@ -171,6 +171,18 @@ st.markdown(
         color: #495057; 
         white-space: pre-wrap;
     }
+    
+    .btn-correct {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 10px;
+        background-color: #10b981;    /* 초록색 */
+        color: #fff;
+        border: 1px solid #10b981;
+        font-weight: 700;
+        cursor: not-allowed;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -194,7 +206,7 @@ context_text = build_context_from_segments(segments, quiz_title)
 # 요약 내용: 사용자가 원할 때만 보이도록 st.expander 사용
 if context_text:
     html_summary = context_text.replace("\n", "<br>")
-    with st.expander("해당 챕터의 요약 내용 (답을 모를 시 열어보세요.)"):
+    with st.expander("해당 챕터의 요약 내용 보기"):
         st.markdown(
             f"<div class='summary-text'><p>{html_summary}</p></div>",
             unsafe_allow_html=True
@@ -280,29 +292,18 @@ for idx, q in enumerate(quizzes):
 
         # 정답 확인 버튼 위치 및 정렬 (입력 필드와 일직선상에 오도록)
         with col_check:
-            
-            # 정답 확인 버튼 출력
-            if st.button("정답 확인", key=f"check_{idx}", type="primary", use_container_width=True): 
-                result = check_answer(q, states[idx]["answer"])
-                states[idx]["tries"] += 1
-                states[idx]["is_correct"] = bool(result.get("correct", False))
-                states[idx]["feedback"] = result.get("feedback", "")
-                st.rerun()
-            
-            # 정답일 경우 버튼 색상 변경을 위한 JavaScript 삽입
-            st.markdown(f"""
-            <script>
-                const button = document.querySelector('[key="check_{idx}"] button');
-                if (button) {{
-                    button.setAttribute('data-is-correct', '{str(states[idx]["is_correct"]).lower()}');
-                    # OX 버튼의 수직 정렬을 위한 CSS 조정
-                    const container = button.closest('div[data-testid^="stColumn"]');
-                    if (container) {{
-                        container.style.marginTop = '-5px'; 
-                    }}
-                }}
-            </script>
-            """, unsafe_allow_html=True)
+            if states[idx]["is_correct"]:
+                # 정답이면 초록색(비활성) 버튼 표시
+                st.markdown('<button class="btn-correct" disabled>정답 확인</button>', unsafe_allow_html=True)
+            else:
+                # 오답/미채점이면 원래 버튼 표시
+                if st.button("정답 확인", key=f"check_{idx}", type="primary", use_container_width=True):
+                    result = check_answer(q, states[idx]["answer"])
+                    states[idx]["tries"] += 1
+                    states[idx]["is_correct"] = bool(result.get("correct", False))
+                    states[idx]["feedback"] = result.get("feedback", "")
+                    st.rerun()
+
 
 
     else: # Short Answer
@@ -320,24 +321,16 @@ for idx, q in enumerate(quizzes):
 
         # 정답 확인 버튼 위치 및 정렬 (입력 필드와 일직선상에 오도록)
         with col_check:
-            
-            # 정답 확인 버튼 출력
-            if st.button("정답 확인", key=f"check_{idx}", type="primary", use_container_width=True): 
-                result = check_answer(q, states[idx]["answer"])
-                states[idx]["tries"] += 1
-                states[idx]["is_correct"] = bool(result.get("correct", False))
-                states[idx]["feedback"] = result.get("feedback", "")
-                st.rerun()
-                
-            # 정답일 경우 버튼 색상 변경을 위한 JavaScript 삽입
-            st.markdown(f"""
-            <script>
-                const button = document.querySelector('[key="check_{idx}"] button');
-                if (button) {{
-                    button.setAttribute('data-is-correct', '{str(states[idx]["is_correct"]).lower()}');
-                }}
-            </script>
-            """, unsafe_allow_html=True)
+            if states[idx]["is_correct"]:
+                st.markdown('<button class="btn-correct" disabled>정답 확인</button>', unsafe_allow_html=True)
+            else:
+                if st.button("정답 확인", key=f"check_{idx}", type="primary", use_container_width=True):
+                    result = check_answer(q, states[idx]["answer"])
+                    states[idx]["tries"] += 1
+                    states[idx]["is_correct"] = bool(result.get("correct", False))
+                    states[idx]["feedback"] = result.get("feedback", "")
+                    st.rerun()
+
 
     # 결과 표시: 정답일 시 박스 및 '다시 시도' 버튼 제거 
     if states[idx]["is_correct"]:

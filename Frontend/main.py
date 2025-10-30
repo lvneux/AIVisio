@@ -672,12 +672,76 @@ if not st.session_state.learning_started:
 segments, load_err = load_segments(st.session_state.selected_video_id)
 # 챕터 제목은 중복 제거 후 순서 유지
 titles = unique_preserve_order([item["title"] for item in segments]) if segments else []
-# 챕터 제목별 Bloom category 매핑 (첫 번째 세그먼트를 대표로 사용)
-title_to_bloom = {
-    item["title"]: item["bloom_category"]
-    for item in segments
-    if item.get("bloom_category") is not None
+
+# === BLOOM 단계 매핑 & 게이트키핑 준비 ===
+# 영어 → 한국어 매핑
+BLOOM_EN2KO = {
+    "Remember": "기억",
+    "Understand": "이해",
+    "Apply": "적용",
+    "Analyse": "분석",
+    "Analyze": "분석",  # 철자 변형도 대응
+    "Evaluate": "평가",
+    "Create": "창조",
 }
+# 진행 순서(1→6)
+BLOOM_ORDER = ["기억", "이해", "적용", "분석", "평가", "창조"]
+
+# 제목별 BLOOM(한글) 매핑
+title_to_bloom = {}
+for it in (segments or []):
+    t = it.get("title")
+    cat_en = (it.get("bloom_category") or "").strip()
+    cat_ko = BLOOM_EN2KO.get(cat_en) if cat_en else None
+    if t:
+        title_to_bloom[t] = cat_ko
+
+# 단계별 챕터 모음
+stage_to_titles = {ko: [] for ko in BLOOM_ORDER}
+for t in (titles or []):
+    ko = title_to_bloom.get(t)
+    if ko in stage_to_titles:
+        stage_to_titles[ko].append(t)
+
+# 완료된 챕터 집합
+completed_set = set(st.session_state.completed_chapters)
+
+# 해당 단계가 완료되었는지(해당 단계의 모든 챕터가 완료) 판단
+def stage_complete(stage_ko: str) -> bool:
+    req = stage_to_titles.get(stage_ko, [])
+    # 챕터가 0개인 단계는 '자동 완료'로 간주 (막히지 않도록)
+    return all(t in completed_set for t in req)
+
+# 열려 있는(선택 가능한) 최고 단계 계산
+unlocked_stage_idx = 0
+for i, s in enumerate(BLOOM_ORDER):
+    # 이전 단계들이 모두 완료되었는지 확인
+    if i == 0:
+        unlocked_stage_idx = 0
+    else:
+        prev_all_done = all(stage_complete(BLOOM_ORDER[j]) for j in range(i))
+        if prev_all_done:
+            unlocked_stage_idx = i
+        else:
+            break
+unlocked_stage = BLOOM_ORDER[unlocked_stage_idx]
+
+# 현재 선택된 단계가 없거나, 잠긴 단계라면 '열린 단계'로 강제 설정
+if (
+    st.session_state.selected_bloom_stage is None
+    or BLOOM_ORDER.index(st.session_state.selected_bloom_stage) > unlocked_stage_idx
+):
+    st.session_state.selected_bloom_stage = unlocked_stage
+
+_cur_title = st.session_state.get("selected_title")
+if _cur_title:
+    _cur_stage = title_to_bloom.get(_cur_title)
+    if _cur_stage and stage_complete(_cur_stage):
+        _idx = BLOOM_ORDER.index(_cur_stage)
+        # only move forward if we're still on the just-finished stage
+        if st.session_state.selected_bloom_stage == _cur_stage and _idx < len(BLOOM_ORDER) - 1:
+            st.session_state.selected_bloom_stage = BLOOM_ORDER[_idx + 1]
+            st.rerun()
 
 
 # [수정] 블룸 인지 단계 버튼 위에 '학습 단계' 제목 추가
@@ -690,27 +754,46 @@ bloom_stages = [
     ("3단계: 적용", "적용"),
     ("4단계: 분석", "분석"),
     ("5단계: 평가", "평가"),
-    ("6단계: 창조", "창조")
+    ("6단계: 창조", "창조"),
 ]
 
-# 6개의 컬럼을 생성하여 버튼을 가로로 나열
-cols_bloom = st.columns(6) 
+cols_bloom = st.columns(6)
 for i, (full_text, category_name) in enumerate(bloom_stages):
     is_selected = st.session_state.selected_bloom_stage == category_name
     btn_key = f"bloom_btn_horizontal_{category_name}"
-    
+
+    # 진행도 텍스트 (예: 2/5)
+    total_cnt = len(stage_to_titles.get(category_name, []))
+    done_cnt = sum(1 for t in stage_to_titles.get(category_name, []) if t in completed_set)
+    progress_txt = f"{done_cnt}/{total_cnt}" if total_cnt > 0 else "0/0"
+
+    # 잠금 여부
+    idx = BLOOM_ORDER.index(category_name)
+    is_completed_stage = stage_complete(category_name)
+
+    disabled = (idx > unlocked_stage_idx) or is_completed_stage
+
+    label = f"{full_text} ({progress_txt})"
+    if is_completed_stage:
+        label = f"{full_text} ({progress_txt}) · 완료"
+
     with cols_bloom[i]:
-        # 커스텀 스타일 적용을 위한 HTML 래퍼 (기존 스타일 패턴 유지)
         class_name = "stage-button-style selected" if is_selected else "stage-button-style"
         st.markdown(f'<div class="{class_name}" id="wrap_{btn_key}">', unsafe_allow_html=True)
-        
-        # Streamlit 버튼 생성
-        if st.button(full_text, key=btn_key, use_container_width=True):
-            # 선택된 버튼을 다시 누르면 초기화 (None으로 돌아감)
-            st.session_state.selected_bloom_stage = category_name if not is_selected else None
+
+        # 라벨에 진행도 병기
+        label = f"{full_text} ({progress_txt})"
+
+        if st.button(label, key=btn_key, use_container_width=True, disabled=disabled):
+            st.session_state.selected_bloom_stage = category_name
             st.rerun()
-            
-        st.markdown('</div>', unsafe_allow_html=True) # HTML 래퍼 닫기
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# 잠긴 단계 안내
+if st.session_state.selected_bloom_stage != unlocked_stage:
+    st.info(f"현재 열려 있는 최고 단계는 **{unlocked_stage}** 입니다. 이전 단계를 모두 완료하면 다음 단계가 열립니다.")
+
 
 st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True) # 추가적인 간격 조정 (없애면 딱 붙음)
 st.markdown("---") 
@@ -719,45 +802,26 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1.5, 3.5, 2])
 
 with col1:
-    # 1. 챕터 목록 
     st.markdown('<div class="section-title">챕터 목록</div>', unsafe_allow_html=True)
     if load_err:
         st.error(load_err)
     elif not titles:
         st.warning("표시할 챕터가 없습니다.")
     else:
-        completed_set = set(st.session_state.completed_chapters)
-        
-        # [추가] Bloom filter 적용
-        filtered_titles = []
-        target_bloom = st.session_state.selected_bloom_stage
-        
-        for t in titles:
-            bloom_cat = title_to_bloom.get(t)
-            # 1) 필터가 선택되지 않았거나 (None)
-            # 2) 챕터에 bloom_category 정보가 없거나
-            # 3) 챕터의 bloom_category가 선택된 필터와 일치하면 포함
-            if target_bloom is None or bloom_cat is None or bloom_cat == target_bloom:
-                 filtered_titles.append(t)
-        
-        # 챕터 버튼 렌더링
-        for i, t in enumerate(titles):
-            completed = t in completed_set
-            
-            # [수정] 필터링: 선택된 필터(target_bloom)와 챕터의 카테고리가 일치하는 경우만 활성화
-            bloom_cat = title_to_bloom.get(t)
-            
-            # 필터가 선택되었고, 챕터의 카테고리가 필터와 일치하지 않으면 비활성화
-            # 다만, 완료된 챕터는 필터와 관계없이 비활성화
-            is_filtered_out = target_bloom is not None and bloom_cat != target_bloom
-            disabled = completed or is_filtered_out
-            
-            
-            if st.button(f"▶ {t}", key=f"chapter_btn_{i}", use_container_width=True, disabled=disabled):
-                # 활성화된 버튼만 클릭 이벤트 발생 (disabled=False)
-                if not disabled:
+        # 현재 선택된 단계의 챕터만 표시
+        target_bloom = st.session_state.selected_bloom_stage  # 예: "이해"
+        filtered_titles = [t for t in titles if title_to_bloom.get(t) == target_bloom]
+
+        if not filtered_titles:
+            st.warning("선택한 학습 단계에 해당하는 챕터가 없습니다.")
+        else:
+            for i, t in enumerate(filtered_titles):
+                completed = t in completed_set
+                # 완료된 챕터는 비활성화
+                if st.button(f"📌 {t}", key=f"chapter_btn_{i}", use_container_width=True, disabled=completed):
                     st.session_state.selected_title = t
                     st.rerun()
+
 
 
 with col2:
@@ -815,6 +879,7 @@ with col2:
     else:
         # [수정] 텍스트 변경
         st.info("단계별로 학습하세요. 챕터를 선택하면 관련 퀴즈를 풀 수 있습니다.")
+    
         
     st.markdown("---")
 
