@@ -18,7 +18,7 @@ def load_segments() -> List[Dict[str, Any]]:
     Load the same segments JSON used by main.py.
     Path: root/Backend/output/E6DuimPZDz8_segments_with_subtitles.json
     """
-    json_path = "./Backend/output/aircAruvnKk_segments_with_subtitles.json"
+    json_path = "./Backend/output/aircAruvnKk_segments_with_subtitles_en.json"
 
     try:
         with open(json_path, "r", encoding="utf-8") as f:
