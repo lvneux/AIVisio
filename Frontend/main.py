@@ -706,45 +706,9 @@ for t in (titles or []):
 # 완료된 챕터 집합
 completed_set = set(st.session_state.completed_chapters)
 
-# 해당 단계가 완료되었는지(해당 단계의 모든 챕터가 완료) 판단
-def stage_complete(stage_ko: str) -> bool:
-    req = stage_to_titles.get(stage_ko, [])
-    # 챕터가 0개인 단계는 '자동 완료'로 간주 (막히지 않도록)
-    return all(t in completed_set for t in req)
+if "selected_bloom_stage" not in st.session_state:
+    st.session_state.selected_bloom_stage = BLOOM_ORDER[0] 
 
-# 열려 있는(선택 가능한) 최고 단계 계산
-unlocked_stage_idx = 0
-for i, s in enumerate(BLOOM_ORDER):
-    # 이전 단계들이 모두 완료되었는지 확인
-    if i == 0:
-        unlocked_stage_idx = 0
-    else:
-        prev_all_done = all(stage_complete(BLOOM_ORDER[j]) for j in range(i))
-        if prev_all_done:
-            unlocked_stage_idx = i
-        else:
-            break
-unlocked_stage = BLOOM_ORDER[unlocked_stage_idx]
-
-# 현재 선택된 단계가 없거나, 잠긴 단계라면 '열린 단계'로 강제 설정
-if (
-    st.session_state.selected_bloom_stage is None
-    or BLOOM_ORDER.index(st.session_state.selected_bloom_stage) > unlocked_stage_idx
-):
-    st.session_state.selected_bloom_stage = unlocked_stage
-
-_cur_title = st.session_state.get("selected_title")
-if _cur_title:
-    _cur_stage = title_to_bloom.get(_cur_title)
-    if _cur_stage and stage_complete(_cur_stage):
-        _idx = BLOOM_ORDER.index(_cur_stage)
-        # only move forward if we're still on the just-finished stage
-        if st.session_state.selected_bloom_stage == _cur_stage and _idx < len(BLOOM_ORDER) - 1:
-            st.session_state.selected_bloom_stage = BLOOM_ORDER[_idx + 1]
-            st.rerun()
-
-
-# [수정] 블룸 인지 단계 버튼 위에 '학습 단계' 제목 추가
 st.markdown('<div class="section-title" style="margin-bottom: 5px;">학습 단계</div>', unsafe_allow_html=True)
 
 # [수정] 블룸 인지 단계 버튼을 챕터 목록 위에 가로로 나열
@@ -767,33 +731,15 @@ for i, (full_text, category_name) in enumerate(bloom_stages):
     done_cnt = sum(1 for t in stage_to_titles.get(category_name, []) if t in completed_set)
     progress_txt = f"{done_cnt}/{total_cnt}" if total_cnt > 0 else "0/0"
 
-    # 잠금 여부
-    idx = BLOOM_ORDER.index(category_name)
-    is_completed_stage = stage_complete(category_name)
-
-    disabled = (idx > unlocked_stage_idx) or is_completed_stage
-
     label = f"{full_text} ({progress_txt})"
-    if is_completed_stage:
-        label = f"{full_text} ({progress_txt}) · 완료"
-
     with cols_bloom[i]:
         class_name = "stage-button-style selected" if is_selected else "stage-button-style"
         st.markdown(f'<div class="{class_name}" id="wrap_{btn_key}">', unsafe_allow_html=True)
-
-        # 라벨에 진행도 병기
-        label = f"{full_text} ({progress_txt})"
-
-        if st.button(label, key=btn_key, use_container_width=True, disabled=disabled):
+        if st.button(label, key=btn_key, use_container_width=True):
             st.session_state.selected_bloom_stage = category_name
             st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
-
-# 잠긴 단계 안내
-if st.session_state.selected_bloom_stage != unlocked_stage:
-    st.info(f"현재 열려 있는 최고 단계는 **{unlocked_stage}** 입니다. 이전 단계를 모두 완료하면 다음 단계가 열립니다.")
-
 
 st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True) # 추가적인 간격 조정 (없애면 딱 붙음)
 st.markdown("---") 
