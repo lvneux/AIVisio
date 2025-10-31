@@ -5,8 +5,19 @@ import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
 
+# .env 파일 경로 확인 및 로드
+env_path = Path(__file__).resolve().parents[2] / ".env"  # 프로젝트 루트의 .env
+print(f"[DEBUG] .env 파일 경로: {env_path}")
+print(f"[DEBUG] .env 파일 존재 여부: {env_path.exists()}")
+
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"[DEBUG] .env 파일 로드 완료: {env_path}")
+else:
+    # 루트에서 직접 로드 시도
+    load_dotenv()
+    print(f"[DEBUG] 기본 경로에서 .env 파일 로드 시도")
 
 try:
     from openai import OpenAI  # optional dependency
@@ -17,12 +28,35 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("quiz")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# 디버그 출력
+print(f"[DEBUG] OPENAI_API_KEY 존재 여부: {bool(OPENAI_API_KEY)}")
+if OPENAI_API_KEY:
+    key_preview = OPENAI_API_KEY[:10] + "..." + OPENAI_API_KEY[-4:] if len(OPENAI_API_KEY) > 14 else "***"
+    print(f"[DEBUG] OPENAI_API_KEY 길이: {len(OPENAI_API_KEY)}")
+    print(f"[DEBUG] OPENAI_API_KEY 미리보기: {key_preview}")
+    print(f"[DEBUG] OPENAI_API_KEY 시작 부분: {OPENAI_API_KEY[:7] if len(OPENAI_API_KEY) >= 7 else 'N/A'}")
+else:
+    print(f"[DEBUG] OPENAI_API_KEY가 설정되지 않았습니다!")
+    print(f"[DEBUG] 환경변수 목록 확인:")
+    all_env_keys = [k for k in os.environ.keys() if 'OPENAI' in k.upper() or 'API' in k.upper()]
+    if all_env_keys:
+        print(f"[DEBUG] 관련 환경변수: {all_env_keys}")
+    else:
+        print(f"[DEBUG] 관련 환경변수를 찾을 수 없습니다.")
 _client = None
 if OpenAI and OPENAI_API_KEY:
     try:
         _client = OpenAI(api_key=OPENAI_API_KEY)
-    except Exception:
+        print(f"[DEBUG] OpenAI 클라이언트 초기화 성공")
+    except Exception as e:
         _client = None
+        print(f"[DEBUG] OpenAI 클라이언트 초기화 실패: {e}")
+else:
+    if not OpenAI:
+        print(f"[DEBUG] OpenAI 패키지가 설치되지 않았습니다.")
+    if not OPENAI_API_KEY:
+        print(f"[DEBUG] OPENAI_API_KEY가 없어 클라이언트를 초기화할 수 없습니다.")
 
 MODEL_FOR_GEN = "gpt-4o-mini"
 MODEL_FOR_JUDGE = "gpt-4o-mini"
