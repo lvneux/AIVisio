@@ -8,7 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from Backend.controllers.quiz import generate_quizzes, check_answer
+from Backend.controllers.quiz import generate_quizzes, check_answer, save_quiz_data, load_quiz_data
 
 st.set_page_config(page_title="AIVisio - Quiz", layout="wide")
 
@@ -19,19 +19,27 @@ def load_segments() -> List[Dict[str, Any]]:
     """
     try:
         output_dir = ROOT_DIR / "Backend" / "output"
-        video_id_prefix = st.session_state.get("selected_video_id", "aircAruvnKk") 
-        original_path = output_dir / f"{video_id_prefix}_segments_with_subtitles.json"
-
+        video_id_prefix = st.session_state.get("selected_video_id", "aircAruvnKk")
+        
+        # 영상 ID별 폴더 경로
+        video_dir = output_dir / video_id_prefix
+        
         json_path_to_load = None
-        if original_path.exists():
-            json_path_to_load = original_path
+        
+        # 새 구조: output/{video_id}/segments_with_subtitles_*.json
+        pattern = "segments_with_subtitles_*.json"
+        found_files = list(video_dir.glob(pattern)) if video_dir.exists() else []
+        
+        if found_files:
+            json_path_to_load = found_files[0]
         else:
-            pattern = f"{video_id_prefix}_segments_with_subtitles_*.json"
-            found_files = list(output_dir.glob(pattern))
-            if found_files:
-                json_path_to_load = found_files[0]
+            # 이전 구조 호환성: output/{video_id}_segments_with_subtitles*.json
+            old_pattern = f"{video_id_prefix}_segments_with_subtitles*.json"
+            old_found_files = list(output_dir.glob(old_pattern))
+            if old_found_files:
+                json_path_to_load = old_found_files[0]
             else:
-                st.error(f"세그먼트 파일 파싱 오류: 'Backend/output/{video_id_prefix}_segments_with_subtitles.json' 또는 언어 코드가 붙은 파일을 찾을 수 없습니다.")
+                st.error(f"세그먼트 파일 파싱 오류: 'Backend/output/{video_id_prefix}/segments_with_subtitles_*.json' 또는 이전 구조 파일을 찾을 수 없습니다.")
                 return []
 
         with open(json_path_to_load, "r", encoding="utf-8") as f:
@@ -284,21 +292,40 @@ else:
 
 
 # 세션 준비
+video_id = st.session_state.get("selected_video_id", "aircAruvnKk")
+
+# 저장된 퀴즈 데이터 불러오기
+saved_data = load_quiz_data(video_id, quiz_title)
+
 if "quizzes" not in st.session_state:
     st.session_state.quizzes = {}
 if quiz_title not in st.session_state.quizzes:
-    with st.spinner("퀴즈를 생성 중입니다..."):
-        st.session_state.quizzes[quiz_title] = generate_quizzes(quiz_title, context_text, bloom_stage)
+    # 저장된 퀴즈가 있으면 사용, 없으면 새로 생성
+    if saved_data and saved_data.get("quizzes"):
+        st.session_state.quizzes[quiz_title] = saved_data["quizzes"]
+    else:
+        with st.spinner("퀴즈를 생성 중입니다..."):
+            new_quizzes = generate_quizzes(quiz_title, context_text, bloom_stage)
+            st.session_state.quizzes[quiz_title] = new_quizzes
+            # 생성 후 즉시 저장
+            try:
+                save_quiz_data(video_id, quiz_title, new_quizzes)
+            except Exception as e:
+                st.warning(f"퀴즈 저장 중 오류: {e}")
 
 quizzes = st.session_state.quizzes[quiz_title]
 
 if "quiz_states" not in st.session_state:
     st.session_state.quiz_states = {}
 if quiz_title not in st.session_state.quiz_states:
-    st.session_state.quiz_states[quiz_title] = [
-        {"answer": "", "is_correct": False, "tries": 0, "feedback": ""}
-        for _ in quizzes
-    ]
+    # 저장된 진행도가 있으면 사용, 없으면 초기화
+    if saved_data and saved_data.get("progress"):
+        st.session_state.quiz_states[quiz_title] = saved_data["progress"]
+    else:
+        st.session_state.quiz_states[quiz_title] = [
+            {"answer": "", "is_correct": False, "tries": 0, "feedback": ""}
+            for _ in quizzes
+        ]
 
 states = st.session_state.quiz_states[quiz_title]
 
@@ -368,6 +395,11 @@ for idx, q in enumerate(quizzes):
                     states[idx]["tries"] += 1
                     states[idx]["is_correct"] = bool(result.get("correct", False))
                     states[idx]["feedback"] = result.get("feedback", "")
+                    # 진행도 저장
+                    try:
+                        save_quiz_data(video_id, quiz_title, quizzes, states)
+                    except Exception as e:
+                        st.warning(f"진행도 저장 중 오류: {e}")
                     st.rerun()
 
 
@@ -378,12 +410,17 @@ for idx, q in enumerate(quizzes):
 
         with col_ans:
             # '정답을 입력하세요:' 텍스트 삭제 및 빈 공간 채우기
-            states[idx]["answer"] = st.text_input(
+            # 저장된 답안이 있으면 표시
+            default_value = states[idx].get("answer", "")
+            user_answer = st.text_input(
                 "정답 입력",
                 key=f"q_{idx}_text",
                 placeholder="정답 입력",
                 label_visibility="collapsed", # 라벨 공간을 완전히 없앰
+                value=default_value
             )
+            states[idx]["answer"] = user_answer
+            # 답안 입력 시마다 저장 (실시간 저장은 너무 빈번할 수 있으므로 버튼 클릭 시만 저장)
 
         # 정답 확인 버튼 위치 및 정렬 (입력 필드와 일직선상에 오도록)
         with col_check:
@@ -395,6 +432,11 @@ for idx, q in enumerate(quizzes):
                     states[idx]["tries"] += 1
                     states[idx]["is_correct"] = bool(result.get("correct", False))
                     states[idx]["feedback"] = result.get("feedback", "")
+                    # 진행도 저장
+                    try:
+                        save_quiz_data(video_id, quiz_title, quizzes, states)
+                    except Exception as e:
+                        st.warning(f"진행도 저장 중 오류: {e}")
                     st.rerun()
 
 
@@ -425,3 +467,8 @@ if all_correct and quizzes:
     if quiz_title not in completed_set:
         completed_set.add(quiz_title)
         st.session_state.completed_chapters = list(completed_set)
+    # 완료 시에도 진행도 저장
+    try:
+        save_quiz_data(video_id, quiz_title, quizzes, states)
+    except Exception as e:
+        st.warning(f"완료 상태 저장 중 오류: {e}")

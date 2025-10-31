@@ -455,7 +455,69 @@ def has_pref_transcript(video_id: str) -> bool:
     except (TranscriptsDisabled, Exception):
         return False
 
-# 검색 단계에서부터 "자막 있는 영상"만 추출
+# YouTube URL에서 video ID 추출
+def extract_video_id_from_url(url: str) -> str | None:
+    """YouTube URL에서 video ID를 추출합니다."""
+    if not url:
+        return None
+    
+    # 다양한 YouTube URL 패턴 지원
+    patterns = [
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})',
+        r'youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    
+    # URL이 아니라 직접 video ID 형식인 경우 (11자 영숫자)
+    if re.match(r'^[a-zA-Z0-9_-]{11}$', url.strip()):
+        return url.strip()
+    
+    return None
+
+# URL로부터 영상 정보 가져오기
+@st.cache_data(show_spinner=False)
+def fetch_video_from_url(video_url: str):
+    """YouTube URL 또는 video ID로부터 영상 정보를 가져옵니다."""
+    if not API_KEY:
+        raise RuntimeError("YouTube API 키가 지정되지 않았습니다.")
+    
+    # URL에서 video ID 추출
+    video_id = extract_video_id_from_url(video_url)
+    if not video_id:
+        raise ValueError("올바른 YouTube URL 또는 video ID를 입력해주세요.")
+    
+    # videos API로 영상 정보 가져오기
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {
+        "key": API_KEY,
+        "part": "contentDetails,snippet",
+        "id": video_id,
+    }
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    items = r.json().get("items", [])
+    
+    if not items:
+        raise ValueError("해당 영상을 찾을 수 없습니다.")
+    
+    it = items[0]
+    vid = it["id"]
+    title = it["snippet"]["title"]
+    duration_iso = it["contentDetails"]["duration"]
+    length_sec = parse_duration(duration_iso)
+    
+    return {
+        "id": vid,
+        "title": title,
+        "duration_sec": length_sec,
+        "duration_text": format_duration(length_sec),
+    }
+
+# 검색 단계에서부터 "자막 있는 영상"만 추출 (주제 선택 방식 - 옵션으로 유지)
 @st.cache_data(show_spinner=False)
 def fetch_top_videos(subject: str):
     if not API_KEY:
@@ -519,69 +581,50 @@ def fetch_top_videos(subject: str):
 with st.sidebar:
     st.header("학습 준비")
 
-    subjects = ["Python", "C", "Deep Learning", "LLM"]
-    subject = st.selectbox(
-        "주제 선택",
-        subjects,
-        index=subjects.index(st.session_state.selected_subject)
+    # YouTube URL 입력 필드
+    video_url = st.text_input(
+        "YouTube 영상 URL 또는 Video ID 입력",
+        placeholder="예: https://www.youtube.com/watch?v=VIDEO_ID 또는 VIDEO_ID",
+        help="YouTube 영상 URL 전체를 입력하거나 Video ID만 입력할 수 있습니다."
     )
-    # 주제가 바뀌면 선택 인덱스 초기화
-    if subject != st.session_state.selected_subject:
-        st.session_state.video_choice_idx = 0
-        st.session_state.selected_video_id = None
-        st.session_state.selected_video_title = None
-    st.session_state.selected_subject = subject
-
-    try:
-        vids = fetch_top_videos(subject)
-        st.caption("학습할 영상 1개를 선택하세요.")
-
-        if not vids:
-            st.error("자막 기준(한국어 우선, 없으면 영어 / 자동 생성 제외)에 맞는 영상이 없습니다.")
+    
+    chosen_id, chosen_title = None, None
+    vid_info = None
+    
+    # URL이 입력되었을 때 영상 정보 가져오기
+    if video_url:
+        try:
+            with st.spinner("영상 정보를 가져오는 중..."):
+                vid_info = fetch_video_from_url(video_url)
+            
+            if vid_info:
+                chosen_id = vid_info["id"]
+                chosen_title = vid_info["title"]
+                
+                # 영상 정보 표시
+                st.caption("학습할 영상 정보")
+                
+                # 썸네일 및 제목 표시
+                st.markdown(
+                    thumbnail_with_duration_html(vid_info["id"], vid_info["duration_text"]),
+                    unsafe_allow_html=True
+                )
+                st.markdown(f'<div class="video-title">{vid_info["title"]}</div>', unsafe_allow_html=True)
+                st.caption(f"길이: {vid_info['duration_text']}")
+                
+        except ValueError as e:
+            st.error(str(e))
             chosen_id, chosen_title = None, None
-        else:
-            # 현재 선택 인덱스 보정
-            if st.session_state.video_choice_idx >= len(vids):
-                st.session_state.video_choice_idx = 0
-
-            # 각 항목을 카드형으로 렌더링 (버튼+썸네일+제목)
-            for i, v in enumerate(vids):
-                
-                # selected 상태를 먼저 파악
-                selected = (i == st.session_state.video_choice_idx)
-                
-                # div에 .selected 클래스 동적 할당
-                class_name = "pick-row selected" if selected else "pick-row"
-                st.markdown(f'<div class="{class_name}">', unsafe_allow_html=True)
-                
-                # 왼쪽 버튼 컬럼을 충분히 넓혀 정사각 버튼이 잘 보이도록 조정
-                left, right = st.columns([2.0, 11.5], vertical_alignment="top")
-
-                # 좌측 '선택' 버튼
-                with left:
-                    label = "V" if selected else ""
-                    if st.button(label, key=f"pick_btn_{i}", help="클릭하여 영상 선택"):
-                        st.session_state.video_choice_idx = i
-                        st.session_state.selected_bloom_stage = None # 영상 변경 시 필터 초기화
-                        st.rerun()
-                
-                # 우측 썸네일 + 제목
-                with right:
-                    st.markdown(
-                        thumbnail_with_duration_html(v["id"], v["duration_text"]),
-                        unsafe_allow_html=True
-                    )
-                    st.markdown(f'<div class="video-title">{v["title"]}</div>', unsafe_allow_html=True)
-
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # 최종 선택값
-            chosen_id = vids[st.session_state.video_choice_idx]["id"]
-            chosen_title = vids[st.session_state.video_choice_idx]["title"]
-
-    except Exception as e:
-        st.error(f"유튜브 API 오류: {e}")
-        chosen_id, chosen_title = None, None
+        except Exception as e:
+            st.error(f"영상 정보를 가져오는 중 오류가 발생했습니다: {e}")
+            chosen_id, chosen_title = None, None
+    
+    if not video_url:
+        st.info("위에 YouTube 영상 URL 또는 Video ID를 입력해주세요.")
+        st.caption("예시:")
+        st.caption("• https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        st.caption("• https://youtu.be/dQw4w9WgXcQ")
+        st.caption("• dQw4w9WgXcQ (Video ID만)")
 
     # 학습 시작 버튼: 가운데 정렬
     st.markdown('<div class="center-wrap">', unsafe_allow_html=True)

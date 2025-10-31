@@ -10,12 +10,34 @@ from Backend.models.video_segment import VideoSegment
 from .utils import seconds_to_time_str
 
 
-def ensure_output_dir():
-    """output 폴더가 존재하는지 확인하고 없으면 생성합니다."""
-    # osc 폴더를 기준으로 한 절대 경로 사용
+def ensure_output_dir(video_id: str = None):
+    """output 폴더가 존재하는지 확인하고 없으면 생성합니다.
+    
+    Args:
+        video_id (str, optional): 영상 ID가 주어지면 {output_dir}/{video_id} 폴더를 생성
+    """
+    # output 폴더를 기준으로 한 절대 경로 사용
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     output_dir = os.path.join(current_dir, 'output')
-    os.makedirs(output_dir, exist_ok=True)
+    
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"[INFO] Output 디렉토리 확인/생성: {output_dir}")
+    except Exception as e:
+        print(f"[ERROR] Output 디렉토리 생성 실패: {e}")
+        raise
+    
+    # 영상 ID별 폴더 생성
+    if video_id and video_id.strip():
+        video_dir = os.path.join(output_dir, video_id)
+        try:
+            os.makedirs(video_dir, exist_ok=True)
+            print(f"[INFO] 영상 ID 디렉토리 확인/생성: {video_dir}")
+            return video_dir
+        except Exception as e:
+            print(f"[ERROR] 영상 ID 디렉토리 생성 실패: {e}")
+            raise
+    
     return output_dir
 
 
@@ -23,10 +45,18 @@ def save_segments_to_json(segments: List[VideoSegment], video_id: str, output_pa
     """
     세그먼트 정보를 JSON 파일로 저장합니다.
     """
-    output_dir = ensure_output_dir()
+    # 영상 ID별 폴더 생성
+    video_dir = ensure_output_dir(video_id)
+    
+    # 폴더가 실제로 존재하는지 재확인
+    if not os.path.exists(video_dir):
+        print(f"[WARN] 폴더가 존재하지 않아 다시 생성 시도: {video_dir}")
+        os.makedirs(video_dir, exist_ok=True)
+        if not os.path.exists(video_dir):
+            raise OSError(f"폴더 생성 실패: {video_dir}")
     
     if output_path is None:
-        output_path = f'{output_dir}/{video_id}_segments.json'
+        output_path = os.path.join(video_dir, f'{video_id}_segments.json')
     
     segments_data = {
         "video_id": video_id,
@@ -62,10 +92,18 @@ def save_segments_to_txt(segments: List[VideoSegment], video_id: str, output_pat
     """
     세그먼트 정보를 읽기 쉬운 TXT 파일로 저장합니다.
     """
-    output_dir = ensure_output_dir()
+    # 영상 ID별 폴더 생성
+    video_dir = ensure_output_dir(video_id)
+    
+    # 폴더가 실제로 존재하는지 재확인
+    if not os.path.exists(video_dir):
+        print(f"[WARN] 폴더가 존재하지 않아 다시 생성 시도: {video_dir}")
+        os.makedirs(video_dir, exist_ok=True)
+        if not os.path.exists(video_dir):
+            raise OSError(f"폴더 생성 실패: {video_dir}")
     
     if output_path is None:
-        output_path = f'{output_dir}/{video_id}_segments.txt'
+        output_path = os.path.join(video_dir, f'{video_id}_segments.txt')
     
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(f"=== 비디오 세그먼트 정보 ===\n")
@@ -93,12 +131,21 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
     자막이 매핑된 세그먼트 정보를 JSON 파일로 저장합니다.
     AI 요약을 포함합니다.
     """
-    output_dir = ensure_output_dir()
+    # 영상 ID별 폴더 생성
+    video_dir = ensure_output_dir(video_id)
+    
+    # 폴더가 실제로 존재하는지 재확인
+    if not os.path.exists(video_dir):
+        print(f"[WARN] 폴더가 존재하지 않아 다시 생성 시도: {video_dir}")
+        os.makedirs(video_dir, exist_ok=True)
+        if not os.path.exists(video_dir):
+            raise OSError(f"폴더 생성 실패: {video_dir}")
     
     if output_path is None:
         # 언어 코드를 파일명에 포함
         lang_suffix = "kr" if language_code == "ko" else "en"
-        output_path = f'{output_dir}/{video_id}_segments_with_subtitles_{lang_suffix}.json'
+        # 영상 ID 폴더 안에 저장, 파일명에서 video_id 제거 (폴더명에 이미 포함)
+        output_path = os.path.join(video_dir, f'segments_with_subtitles_{lang_suffix}.json')
     
     segments_data = {
         "video_id": video_id,
@@ -138,7 +185,17 @@ def save_segments_with_subtitles_to_json(segments: List[VideoSegment], video_id:
         }
         segments_data["segments"].append(segment_dict)
     
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(segments_data, f, ensure_ascii=False, indent=2)
-    
-    print(f"✅ AI 요약과 Bloom 분류가 포함된 세그먼트 JSON 저장 완료: {output_path}") 
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(segments_data, f, ensure_ascii=False, indent=2)
+        
+        # 파일이 실제로 저장되었는지 확인
+        if not os.path.exists(output_path):
+            raise OSError(f"파일 저장 실패: {output_path}")
+        
+        print(f"✅ AI 요약과 Bloom 분류가 포함된 세그먼트 JSON 저장 완료: {output_path}")
+    except Exception as e:
+        print(f"[ERROR] 파일 저장 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
+        raise 

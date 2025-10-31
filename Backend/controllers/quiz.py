@@ -6,6 +6,8 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 
+# 퀴즈 저장/로드 함수 포함
+
 # .env 파일 경로 확인 및 로드
 env_path = Path(__file__).resolve().parents[2] / ".env"  # 프로젝트 루트의 .env
 print(f"[DEBUG] .env 파일 경로: {env_path}")
@@ -338,3 +340,140 @@ def generate_quizzes_from_json(chapter_title: str, json_path: Path) -> List[Dict
     """
     context_text, bloom_stage = build_context_from_json(json_path, chapter_title)
     return generate_quizzes(chapter_title, context_text, bloom_stage)
+
+
+def save_quiz_data(video_id: str, chapter_title: str, quizzes: List[Dict[str, Any]], progress: Optional[List[Dict[str, Any]]] = None) -> Path:
+    """
+    퀴즈 데이터와 진행도를 JSON 파일로 저장합니다.
+    
+    Args:
+        video_id: 영상 ID
+        chapter_title: 챕터 제목
+        quizzes: 퀴즈 목록
+        progress: 진행도 목록 (각 퀴즈별 정답, 시도 횟수 등)
+    
+    Returns:
+        저장된 파일 경로
+    """
+    from datetime import datetime
+    
+    # output/{video_id}/ 폴더 경로
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(current_dir, 'output')
+    video_dir = os.path.join(output_dir, video_id)
+    
+    # 폴더 생성
+    os.makedirs(video_dir, exist_ok=True)
+    
+    quiz_file = os.path.join(video_dir, 'quiz.json')
+    
+    # 기존 파일이 있으면 로드
+    quiz_data = {}
+    if os.path.exists(quiz_file):
+        try:
+            with open(quiz_file, 'r', encoding='utf-8') as f:
+                quiz_data = json.load(f)
+        except Exception as e:
+            LOGGER.warning(f"[quiz] 기존 퀴즈 파일 로드 실패: {e}")
+            quiz_data = {}
+    
+    # 기본 구조 초기화
+    if "video_id" not in quiz_data:
+        quiz_data["video_id"] = video_id
+    if "chapters" not in quiz_data:
+        quiz_data["chapters"] = {}
+    
+    # 챕터 데이터 업데이트
+    if chapter_title not in quiz_data["chapters"]:
+        quiz_data["chapters"][chapter_title] = {
+            "quizzes": [],
+            "progress": [],
+            "created_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat()
+        }
+    
+    # 퀴즈 저장 (기존 퀴즈가 없거나 새로 생성된 경우)
+    if not quiz_data["chapters"][chapter_title]["quizzes"]:
+        quiz_data["chapters"][chapter_title]["quizzes"] = quizzes
+    elif len(quiz_data["chapters"][chapter_title]["quizzes"]) != len(quizzes):
+        # 퀴즈 개수가 다르면 업데이트 (기존 진행도는 유지하려고 노력)
+        old_progress = quiz_data["chapters"][chapter_title].get("progress", [])
+        quiz_data["chapters"][chapter_title]["quizzes"] = quizzes
+        # 진행도도 업데이트 (새 퀴즈 개수에 맞춰 조정)
+        if progress:
+            quiz_data["chapters"][chapter_title]["progress"] = progress
+        elif old_progress:
+            # 기존 진행도가 있으면 최대한 유지 (개수가 맞지 않으면 초기화)
+            if len(old_progress) == len(quizzes):
+                quiz_data["chapters"][chapter_title]["progress"] = old_progress
+            else:
+                quiz_data["chapters"][chapter_title]["progress"] = [
+                    {"answer": "", "is_correct": False, "tries": 0, "feedback": ""}
+                    for _ in quizzes
+                ]
+    
+    # 진행도 저장
+    if progress:
+        quiz_data["chapters"][chapter_title]["progress"] = progress
+    elif "progress" not in quiz_data["chapters"][chapter_title]:
+        # 진행도가 없으면 초기화
+        quiz_data["chapters"][chapter_title]["progress"] = [
+            {"answer": "", "is_correct": False, "tries": 0, "feedback": ""}
+            for _ in quizzes
+        ]
+    
+    # 마지막 업데이트 시간
+    quiz_data["chapters"][chapter_title]["last_updated"] = datetime.now().isoformat()
+    
+    # 파일 저장
+    try:
+        with open(quiz_file, 'w', encoding='utf-8') as f:
+            json.dump(quiz_data, f, ensure_ascii=False, indent=2)
+        LOGGER.info(f"[quiz] 퀴즈 데이터 저장 완료: {quiz_file}")
+        return Path(quiz_file)
+    except Exception as e:
+        LOGGER.error(f"[quiz] 퀴즈 데이터 저장 실패: {e}")
+        raise
+
+
+def load_quiz_data(video_id: str, chapter_title: str = None) -> Dict[str, Any]:
+    """
+    저장된 퀴즈 데이터를 불러옵니다.
+    
+    Args:
+        video_id: 영상 ID
+        chapter_title: 챕터 제목 (None이면 전체 데이터 반환)
+    
+    Returns:
+        퀴즈 데이터 딕셔너리 (chapter_title이 지정되면 해당 챕터만, 아니면 전체)
+    """
+    # output/{video_id}/ 폴더 경로
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(current_dir, 'output')
+    video_dir = os.path.join(output_dir, video_id)
+    quiz_file = os.path.join(video_dir, 'quiz.json')
+    
+    if not os.path.exists(quiz_file):
+        return {}
+    
+    try:
+        with open(quiz_file, 'r', encoding='utf-8') as f:
+            quiz_data = json.load(f)
+        
+        # 특정 챕터만 요청한 경우
+        if chapter_title and isinstance(chapter_title, str):
+            chapters = quiz_data.get("chapters", {})
+            if chapter_title in chapters:
+                return {
+                    "video_id": video_id,
+                    "chapter_title": chapter_title,
+                    "quizzes": chapters[chapter_title].get("quizzes", []),
+                    "progress": chapters[chapter_title].get("progress", [])
+                }
+            return {}
+        
+        # 전체 데이터 반환
+        return quiz_data
+    except Exception as e:
+        LOGGER.error(f"[quiz] 퀴즈 데이터 로드 실패: {e}")
+        return {}
