@@ -61,10 +61,43 @@ else:
 MODEL_FOR_GEN = "gpt-4o-mini"
 MODEL_FOR_JUDGE = "gpt-4o-mini"
 
-def _build_gen_prompt(chapter_title: str, context_text: str) -> List[Dict[str, str]]:
+# 블룸 인지단계 영어→한글 매핑
+BLOOM_EN2KO = {
+    "Remember": "기억",
+    "Understand": "이해",
+    "Apply": "적용",
+    "Analyse": "분석",
+    "Analyze": "분석",  # 철자 변형도 대응
+    "Evaluate": "평가",
+    "Create": "창조",
+}
+
+def _normalize_bloom_stage(bloom_stage: Optional[str]) -> Optional[str]:
+    """
+    블룸 단계를 한글로 정규화.
+    영어 또는 한글로 입력될 수 있음.
+    """
+    if not bloom_stage:
+        return None
+    bloom_stage = bloom_stage.strip()
+    # 이미 한글이면 그대로 반환
+    if bloom_stage in ["기억", "이해", "적용", "분석", "평가", "창조"]:
+        return bloom_stage
+    # 영어면 한글로 변환
+    return BLOOM_EN2KO.get(bloom_stage)
+
+def _build_gen_prompt(chapter_title: str, context_text: str, bloom_stage: Optional[str] = None) -> List[Dict[str, str]]:
     """
     Build a chat prompt to generate 3 short-answer quizzes grounded in the provided summary (context_text).
+    
+    Args:
+        chapter_title: 챕터 제목
+        context_text: 챕터 요약 내용
+        bloom_stage: 블룸 인지단계 (예: "기억", "이해", "적용", "분석", "평가", "창조" 또는 영어)
     """
+    # 블룸 단계 정규화
+    bloom_ko = _normalize_bloom_stage(bloom_stage)
+    
     sys_msg = (
         "당신은 학습 내용을 평가하기 위한 퀴즈를 생성합니다. "
         "반드시 JSON만 반환해야 하며, 설명이나 마크다운은 포함하지 마세요."
@@ -73,10 +106,24 @@ def _build_gen_prompt(chapter_title: str, context_text: str) -> List[Dict[str, s
         "반드시 제공된 요약(Context)에 기반하여 질문을 생성하세요."
         "반드시 한국어로 질문을 생성하세요."
     )
+    
+    # 블룸 단계별 퀴즈 생성 가이드
+    bloom_guidance = ""
+    if bloom_ko:
+        stage_guides = {
+            "기억": "기억 단계에 맞는 퀴즈를 생성하세요. 사실 확인, 정의, 용어 암기 등 기초 지식을 묻는 질문을 만들어주세요.",
+            "이해": "이해 단계에 맞는 퀴즈를 생성하세요. 개념 설명, 의미 파악, 비교 설명 등 내용을 이해했는지 확인하는 질문을 만들어주세요.",
+            "적용": "적용 단계에 맞는 퀴즈를 생성하세요. 학습한 내용을 새로운 상황에 적용하거나 예시를 찾는 질문을 만들어주세요.",
+            "분석": "분석 단계에 맞는 퀴즈를 생성하세요. 내용을 구성요소로 나누거나 관계를 파악하는 질문을 만들어주세요.",
+            "평가": "평가 단계에 맞는 퀴즈를 생성하세요. 비판적 사고, 판단 기준 제시, 가치 평가 등 평가적 관점을 요구하는 질문을 만들어주세요.",
+            "창조": "창조 단계에 맞는 퀴즈를 생성하세요. 새로운 아이디어 제시, 창안, 설계 등 창의적 사고를 요구하는 질문을 만들어주세요.",
+        }
+        bloom_guidance = f"\n블룸 인지단계: {bloom_ko} (Bloom's Taxonomy)\n{stage_guides.get(bloom_ko, '')}\n"
 
     user_msg = (
         f"# 챕터 제목\n{chapter_title}\n\n"
         f"# 요약 (해당 챕터의 내용)\n{context_text or '(요약 없음)'}\n\n"
+        f"{bloom_guidance}"
         "위 내용을 바탕으로 퀴즈 3개를 생성하세요. "
         "모든 문항의 \"type\"은 반드시 \"short\"로 하세요. "
         "정답은 간결한 단답/서술식으로 작성하세요."
@@ -88,17 +135,23 @@ def _build_gen_prompt(chapter_title: str, context_text: str) -> List[Dict[str, s
     ]
 
 
-def generate_quizzes(chapter_title: str, context_text: str) -> List[Dict[str, Any]]:
+def generate_quizzes(chapter_title: str, context_text: str, bloom_stage: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Generate exactly 3 short-answer quizzes using the given chapter title and its summary text (context_text).
     Robust against older openai clients and non-JSON outputs.
+    
+    Args:
+        chapter_title: 챕터 제목
+        context_text: 챕터 요약 내용
+        bloom_stage: 블룸 인지단계 (예: "기억", "이해", "적용", "분석", "평가", "창조" 또는 영어)
+    
     Returns: List[{"type": "short", "question": str, "answer": str}] (length 3)
     """
     try:
         if not (_client and OPENAI_API_KEY):
             raise RuntimeError("OpenAI 클라이언트가 비활성화됨(패키지 미설치 또는 API 키 없음).")
 
-        msgs = _build_gen_prompt(chapter_title, context_text)
+        msgs = _build_gen_prompt(chapter_title, context_text, bloom_stage)
 
         try:
             resp = _client.chat.completions.create(
@@ -236,12 +289,18 @@ def _parse_timecode(ts: Optional[str]) -> Optional[int]:
     except Exception:
         return None
 
-def build_context_from_json(json_path: Path, chapter_title: str) -> str:
+def build_context_from_json(json_path: Path, chapter_title: str) -> tuple[str, Optional[str]]:
     """
     Read the segments JSON and concatenate summaries for the given chapter_title.
+    Also extracts the bloom_category for the chapter.
+    
+    Returns:
+        tuple: (context_text, bloom_stage)
+            - context_text: 요약 텍스트
+            - bloom_stage: 블룸 인지단계 (영어, 예: "Remember", "Understand", etc.)
     """
     if not json_path.exists():
-        return ""
+        return "", None
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -257,13 +316,25 @@ def build_context_from_json(json_path: Path, chapter_title: str) -> str:
     else:
         items = []
 
-    summaries = [it.get("summary", "") for it in items if it.get("title") == chapter_title and it.get("summary")]
-    return "\n\n".join([s for s in summaries if s]).strip()
+    summaries = []
+    bloom_stage = None
+    for it in items:
+        if it.get("title") == chapter_title:
+            summary = it.get("summary", "")
+            if summary:
+                summaries.append(summary)
+            # 블룸 단계는 첫 번째로 찾은 것으로 설정
+            if bloom_stage is None:
+                bloom_stage = it.get("bloom_category")
+    
+    context_text = "\n\n".join([s for s in summaries if s]).strip()
+    return context_text, bloom_stage
 
 
 def generate_quizzes_from_json(chapter_title: str, json_path: Path) -> List[Dict[str, Any]]:
     """
     Convenience wrapper: builds context from the given JSON and calls generate_quizzes.
+    Also extracts bloom_stage from the JSON and passes it to generate_quizzes.
     """
-    context_text = build_context_from_json(json_path, chapter_title)
-    return generate_quizzes(chapter_title, context_text)
+    context_text, bloom_stage = build_context_from_json(json_path, chapter_title)
+    return generate_quizzes(chapter_title, context_text, bloom_stage)

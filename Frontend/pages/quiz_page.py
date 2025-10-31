@@ -2,7 +2,7 @@ import streamlit as st
 from pathlib import Path
 import json
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -48,18 +48,30 @@ def load_segments() -> List[Dict[str, Any]]:
         return []
 
 
-def build_context_from_segments(segments: List[Dict[str, Any]], title: str) -> str:
+def build_context_from_segments(segments: List[Dict[str, Any]], title: str) -> tuple[str, Optional[str]]:
     """
     Concatenate all summaries for the selected chapter title.
+    Also extracts the bloom_category for the chapter.
+    
+    Returns:
+        tuple: (context_text, bloom_stage)
+            - context_text: 요약 텍스트
+            - bloom_stage: 블룸 인지단계 (영어, 예: "Remember", "Understand", etc.)
     """
     if not title:
-        return ""
-    parts = [
-        it.get("summary", "")
-        for it in segments
-        if it.get("title") == title and it.get("summary")
-    ]
-    return "\n\n".join([p for p in parts if p]).strip()
+        return "", None
+    parts = []
+    bloom_stage = None
+    for it in segments:
+        if it.get("title") == title:
+            summary = it.get("summary", "")
+            if summary:
+                parts.append(summary)
+            # 블룸 단계는 첫 번째로 찾은 것으로 설정
+            if bloom_stage is None:
+                bloom_stage = it.get("bloom_category")
+    context_text = "\n\n".join([p for p in parts if p]).strip()
+    return context_text, bloom_stage
 
 
 quiz_title = st.session_state.get("quiz_title")
@@ -182,6 +194,25 @@ st.markdown(
         font-weight: 700;
         cursor: not-allowed;
     }
+    
+    /* 블룸 인지단계 배지 */
+    .bloom-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 14px;
+        margin-top: 8px;
+        margin-bottom: 16px;
+    }
+    .bloom-기억 { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .bloom-이해 { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .bloom-적용 { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .bloom-분석 { background-color: #fce7f3; color: #9f1239; border: 1px solid #fbcfe8; }
+    .bloom-평가 { background-color: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    .bloom-창조 { background-color: #fecdd3; color: #991b1b; border: 1px solid #fda4af; }
 
     </style>
     """,
@@ -201,7 +232,42 @@ st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 st.header(f"퀴즈: {quiz_title}")
 
 segments = load_segments()
-context_text = build_context_from_segments(segments, quiz_title)
+context_text, bloom_stage = build_context_from_segments(segments, quiz_title)
+
+# 블룸 인지단계 표시
+BLOOM_EN2KO = {
+    "Remember": "기억",
+    "Understand": "이해",
+    "Apply": "적용",
+    "Analyse": "분석",
+    "Analyze": "분석",  # 철자 변형도 대응
+    "Evaluate": "평가",
+    "Create": "창조",
+}
+
+# 블룸 단계 번호 매핑
+BLOOM_STAGE_NUM = {
+    "기억": "1단계",
+    "이해": "2단계",
+    "적용": "3단계",
+    "분석": "4단계",
+    "평가": "5단계",
+    "창조": "6단계",
+}
+
+if bloom_stage:
+    bloom_ko = BLOOM_EN2KO.get(bloom_stage, bloom_stage)
+    # 한글이 아니고 영어도 아닌 경우 그대로 표시
+    if bloom_ko not in ["기억", "이해", "적용", "분석", "평가", "창조"]:
+        bloom_ko = bloom_stage
+    
+    stage_num = BLOOM_STAGE_NUM.get(bloom_ko, "")
+    bloom_label = f"{stage_num}: {bloom_ko}" if stage_num else bloom_ko
+    
+    st.markdown(
+        f'<div class="bloom-badge bloom-{bloom_ko}">🧠 {bloom_label}</div>',
+        unsafe_allow_html=True
+    )
 
 # 요약 내용: 사용자가 원할 때만 보이도록 st.expander 사용
 if context_text:
@@ -222,7 +288,7 @@ if "quizzes" not in st.session_state:
     st.session_state.quizzes = {}
 if quiz_title not in st.session_state.quizzes:
     with st.spinner("퀴즈를 생성 중입니다..."):
-        st.session_state.quizzes[quiz_title] = generate_quizzes(quiz_title, context_text)
+        st.session_state.quizzes[quiz_title] = generate_quizzes(quiz_title, context_text, bloom_stage)
 
 quizzes = st.session_state.quizzes[quiz_title]
 
