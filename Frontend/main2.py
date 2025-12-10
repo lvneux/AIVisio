@@ -433,24 +433,32 @@ def thumbnail_with_duration_html(video_id: str, duration_text: str) -> str:
     </div>
     """
 
-# 자막 체크: 한국어 우선, 없으면 영어 / 자동 생성 자막 제외 -> 조건 생략 중
+# 자막 체크: 한국어 우선, 없으면 영어 / 수동 자막 우선, 없으면 자동 생성 자막도 허용
 def has_pref_transcript(video_id: str) -> bool:
     try:
-        tl = YouTubeTranscriptApi.list_transcripts(video_id)
+        ytt_api = YouTubeTranscriptApi()
+        tl = ytt_api.list_transcripts(video_id)
 
         has_manual_ko = False
         has_manual_en = False
+        has_auto_ko = False
+        has_auto_en = False
 
         for t in tl:
-            if not t.is_generated: # 반드시 수동 자막만
+            if not t.is_generated:  # 수동 자막
                 if t.language_code.startswith("ko"):
                     has_manual_ko = True
-                    break # 한국어 수동 자막 있으면 바로 True 반환
+                    break  # 한국어 수동 자막 있으면 바로 True 반환
                 elif t.language_code.startswith("en"):
                     has_manual_en = True
+            else:  # 자동 생성 자막
+                if t.language_code.startswith("ko"):
+                    has_auto_ko = True
+                elif t.language_code.startswith("en"):
+                    has_auto_en = True
 
-        # 한국어 수동 자막이 최우선, 없으면 영어 수동 자막 확인
-        return has_manual_ko or has_manual_en
+        # 한국어 수동 자막이 최우선, 없으면 영어 수동 자막, 없으면 자동 생성 자막 확인
+        return has_manual_ko or has_manual_en or has_auto_ko or has_auto_en
 
     except (TranscriptsDisabled, Exception):
         return False

@@ -8,9 +8,8 @@ from pathlib import Path
 
 from .controllers.transcript import extract_transcript
 from .controllers.youtube_api import get_youtube_chapters
-from .controllers.segments import segment_video_by_description, map_subtitles_to_segments
-from .controllers.file_io import save_segments_to_json, save_segments_to_txt, save_segments_with_subtitles_to_json
-from .controllers.summary import generate_summary
+from .controllers.segments import map_subtitles_to_segments
+from .controllers.file_io import  save_segments_with_subtitles_to_json
 from .controllers.bloom_classifier import BloomClassifier
 
 """
@@ -44,8 +43,6 @@ def main(video_id="E6DuimPZDz8", lang='en'):
         video_id (str, optional): 분석할 YouTube 영상 ID. None이면 selected_video.json에서 로드
         language (str): 자막 언어 ('ko' 또는 'en'). 기본값은 'ko'
     """
-
-
     print("=" * 60)
     print(f"🎬 YouTube 영상 분석 시작 - Video ID: {video_id}")
     print("=" * 60)
@@ -71,6 +68,9 @@ def main(video_id="E6DuimPZDz8", lang='en'):
 
     # 실제 YouTube 챕터 정보 가져오기
     segments = get_youtube_chapters(video_id)
+
+    # 여기다가 custom 세그먼트 추출 코드 추가
+    
 
     # YouTube API를 사용할 수 없는 경우 예시 설명 사용
     if not segments:
@@ -99,8 +99,6 @@ def main(video_id="E6DuimPZDz8", lang='en'):
                 segment.bloom_category = "Unknown"
 
         # 세그먼트 정보 저장
-        #save_segments_to_json(segments, video_id)
-        #save_segments_to_txt(segments, video_id)
         save_segments_with_subtitles_to_json(segments, video_id, language_code=lang)
 
         print(f"\n📈 세그먼트 분석 결과:")
