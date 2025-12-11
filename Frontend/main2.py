@@ -830,8 +830,6 @@ with col1:
                     st.session_state.selected_title = t
                     st.rerun()
 
-
-
 with col2:
     st.markdown('<div class="section-title">추천 교육 영상</div>', unsafe_allow_html=True)
 

@@ -11,6 +11,7 @@ from .controllers.youtube_api import get_youtube_chapters
 from .controllers.segments import map_subtitles_to_segments
 from .controllers.file_io import  save_segments_with_subtitles_to_json
 from .controllers.bloom_classifier import BloomClassifier
+from .controllers.semantic_segmentation import create_semantic_segments
 
 """
 def load_selected_video_id(default: str = "E6DuimPZDz8") -> str:
@@ -69,14 +70,26 @@ def main(video_id="E6DuimPZDz8", lang='en'):
     # 실제 YouTube 챕터 정보 가져오기
     segments = get_youtube_chapters(video_id)
 
-    # 여기다가 custom 세그먼트 추출 코드 추가
-    
-
-    # YouTube API를 사용할 수 없는 경우 예시 설명 사용
+    # YouTube 챕터가 없는 경우 Semantic Segmentation으로 자동 생성
     if not segments:
-        print("⚠️ YouTube API를 사용할 수 없습니다.")
-        print("   환경변수 YOUTUBE_API_KEY를 설정해주세요.")
-        return
+        print("⚠️ YouTube 챕터를 찾을 수 없습니다.")
+        print("🔍 Semantic Segmentation을 이용한 자동 챕터 생성 시도 중...")
+        
+        try:
+            segments = create_semantic_segments(transcript_data, video_id, window_seconds=30)
+            
+            if not segments:
+                print("❌ Semantic Segmentation으로도 챕터를 생성할 수 없습니다.")
+                return
+        except ImportError as e:
+            print(f"❌ Semantic Segmentation 모듈을 사용할 수 없습니다: {e}")
+            print("   pip install sentence-transformers scikit-learn을 실행해주세요.")
+            return
+        except Exception as e:
+            print(f"❌ Semantic Segmentation 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            return
 
     if segments:
         # 자막 매핑

@@ -9,7 +9,7 @@ from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from Backend.controllers.utils import seconds_to_time_str
 
 
-def ensure_output_dir(video_id: str = None):
+def ensure_output_dir(video_id: str ):
     """output 폴더가 존재하는지 확인하고 없으면 생성합니다.
     
     Args:
@@ -40,7 +40,7 @@ def ensure_output_dir(video_id: str = None):
     return output_dir
 
 
-def extract_transcript(video_id, lang='ko'):
+def extract_transcript(video_id : str, lang='ko'):
     """
     YouTube 영상에서 자막을 추출합니다.
     수동 자막을 우선적으로 찾고, 없으면 자동 생성 자막을 사용합니다.
@@ -58,14 +58,14 @@ def extract_transcript(video_id, lang='ko'):
         print(f"🌐 선택 언어: {'한국어' if lang == 'ko' else '영어'}")
         print("🔍 자막을 가져오는 중...")
         
-        ytt_api = YouTubeTranscriptApi()
         transcript_data = None
         final_lang = lang
         transcript_type = None
         
         try:
-            # 1단계: 사용 가능한 자막 목록 가져오기
-            transcript_list = ytt_api.list_transcripts(video_id)
+            # 1단계: 사용 가능한 자막 목록 가져오기 (인스턴스 메서드로 호출)
+            ytt_api = YouTubeTranscriptApi()
+            transcript_list = ytt_api.list(video_id) 
             
             # 2단계: 수동 자막 우선 찾기
             manual_transcript = None
@@ -145,12 +145,14 @@ def extract_transcript(video_id, lang='ko'):
             # 최후의 수단: 직접 fetch 시도 (기존 방식)
             try:
                 print("🔄 직접 fetch 방식으로 재시도...")
+                ytt_api = YouTubeTranscriptApi()
                 # 한국어와 영어 모두 시도
-                for try_lang in [lang, 'ko', 'en']:
+                for try_lang in ['ko', 'en']:
                     if try_lang == lang:
                         continue  # 이미 시도했으므로 스킵
                     try:
-                        transcript_data = ytt_api.fetch(video_id, languages=[try_lang])
+                        # 직접 자막 가져오기 시도
+                        transcript_data = ytt_api.get_transcript(video_id, languages=[try_lang])  # type: ignore
                         final_lang = try_lang
                         lang_name = "한국어" if try_lang == 'ko' else "영어"
                         print(f"✅ {lang_name} 자막을 직접 fetch로 가져왔습니다.")
