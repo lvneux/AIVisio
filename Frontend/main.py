@@ -468,6 +468,28 @@ def fetch_top_videos(subject: str):
                 "duration_text": ""
             }
         ],
+        "NLP": [
+            {
+                "id": "fLvJ8VdHLA0",
+                "title": "What is NLP (Natural Language Processing)?",
+                "duration_sec": 0,
+                "duration_text": ""
+            },
+            {
+                "id": "R-AG4-qZs1A",
+                "title": "Introduction | NLP Tutorial for Python Beginners - Season 1 Episode 1",
+                "duration_sec": 0,
+                "duration_text": ""
+            },
+        ],
+        "Unity": [
+            {
+                "id": "vFjXKOXdgGo",
+                "title": "How to learn Unity without following a tutorial (Development 1)",
+                "duration_sec": 0,
+                "duration_text": ""
+            }
+        ],
         "LLM": [
             {
                 "id": "LPZh9BOjkQs",
@@ -481,9 +503,17 @@ def fetch_top_videos(subject: str):
                 "duration_sec": 0,
                 "duration_text": ""
             }
-        ]
+        ],
+        "RNN": [
+            {
+                "id": "AsNTP8Kwu80",
+                "title": "Recurrent Neural Networks (RNNs)",
+                "duration_sec": 0,
+                "duration_text": ""
+            }
+        ],
     }
-
+    
     preset_list = PRESET_VIDEOS.get(subject, [])
     search_results = []
 
