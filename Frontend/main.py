@@ -458,68 +458,127 @@ def has_pref_transcript(video_id: str) -> bool:
 # 검색 단계에서부터 "자막 있는 영상"만 추출
 @st.cache_data(show_spinner=False)
 def fetch_top_videos(subject: str):
+    # ---- 프리셋 영상 ----
+    PRESET_VIDEOS = {
+        "Deep Learning": [
+            {
+                "id": "aircAruvnKk",
+                "title": "But what is a neural network? | Deep learning chapter 1",
+                "duration_sec": 0,
+                "duration_text": ""
+            }
+        ],
+        "LLM": [
+            {
+                "id": "LPZh9BOjkQs",
+                "title": "Large Language Models explained briefly",
+                "duration_sec": 0,
+                "duration_text": ""
+            },
+            {
+                "id": "wjZofJX0v4M",  
+                "title": "Transformers, the tech behind LLMs",
+                "duration_sec": 0,
+                "duration_text": ""
+            }
+        ]
+    }
+
+    preset_list = PRESET_VIDEOS.get(subject, [])
+    search_results = []
+
+    # ---- 검색 API 로직 (항상 시도) ----
     if not API_KEY:
-        raise RuntimeError("YouTube API 키가 지정되지 않았습니다.")
+        # API 키가 없는데 프리셋도 없는 과목이면 에러
+        if not preset_list:
+            raise RuntimeError("YouTube API 키가 지정되지 않았습니다.")
+    else:
+        q = subject
+        if subject in ["Python", "C"]:
+            q = f"{subject} programming tutorial"
 
-    q = subject
-    if subject in ["Python", "C"]:
-        q = f"{subject} programming tutorial"
+        try:
+            # search API
+            url = "https://www.googleapis.com/youtube/v3/search"
+            params = {
+                "key": API_KEY,
+                "part": "snippet",
+                "q": q,
+                "type": "video",
+                "maxResults": 50,
+                "relevanceLanguage": "ko",
+                "safeSearch": "none",
+            }
+            r = requests.get(url, params=params, timeout=10)
+            r.raise_for_status()
+            items = r.json().get("items", [])
 
-    # search API → 후보 영상 추출
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "key": API_KEY,
-        "part": "snippet",
-        "q": q,
-        "type": "video",
-        "maxResults": 50,
-        "relevanceLanguage": "ko",
-        "safeSearch": "none",
-    }
-    r = requests.get(url, params=params, timeout=10)
-    r.raise_for_status()
-    items = r.json().get("items", [])
+            video_ids = [
+                it.get("id", {}).get("videoId")
+                for it in items
+                if it.get("id", {}).get("videoId")
+            ]
+            if video_ids:
+                # videos API
+                url = "https://www.googleapis.com/youtube/v3/videos"
+                params = {
+                    "key": API_KEY,
+                    "part": "contentDetails,snippet",
+                    "id": ",".join(video_ids),
+                }
+                r = requests.get(url, params=params, timeout=10)
+                r.raise_for_status()
+                items = r.json().get("items", [])
 
-    # videoId 안전 추출
-    video_ids = [it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")]
-    if not video_ids:
-        return []
+                for it in items:
+                    vid = it["id"]
+                    title = it["snippet"]["title"]
+                    duration_iso = it["contentDetails"]["duration"]
+                    length_sec = parse_duration(duration_iso)
 
-    # 2) videos API → 길이/제목 가져오기
-    url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {
-        "key": API_KEY,
-        "part": "contentDetails,snippet",
-        "id": ",".join(video_ids),
-    }
-    r = requests.get(url, params=params, timeout=10)
-    r.raise_for_status()
-    items = r.json().get("items", [])
+                    # 10~30분 범위만 사용
+                    if 600 <= length_sec <= 1800:
+                        search_results.append({
+                            "id": vid,
+                            "title": title,
+                            "duration_sec": length_sec,
+                            "duration_text": format_duration(length_sec),
+                        })
+        except Exception as e:
+            # 검색 실패해도 프리셋이 있으면 프리셋으로만 진행
+            print(f"YouTube API error: {e}")
 
-    results = []
-    for it in items:
-        vid = it["id"]
-        title = it["snippet"]["title"]
-        duration_iso = it["contentDetails"]["duration"]
-        length_sec = parse_duration(duration_iso)
+    # ---- 프리셋 + 검색 결과 합치기 (최대 3개, 프리셋 우선) ----
+    final_list = []
+    seen_ids = set()
 
-        # 영상 길이 (10~30분) 필터
-        if 600 <= length_sec <= 1800:
-            results.append({
-                "id": vid,
-                "title": title,
-                "duration_sec": length_sec,
-                "duration_text": format_duration(length_sec),
-            })
+    # 1) 프리셋 먼저 추가
+    for v in preset_list:
+        vid = v["id"]
+        if vid not in seen_ids:
+            final_list.append(v)
+            seen_ids.add(vid)
 
-    # 상위 3개만 반환
-    return results[:3]
+    # 2) 검색 결과로 나머지 채우기
+    for v in search_results:
+        vid = v["id"]
+        if vid in seen_ids:
+            continue
+        final_list.append(v)
+        seen_ids.add(vid)
+        if len(final_list) >= 3:
+            break
+
+    # 3개가 안 되면 있는 만큼만 반환
+    return final_list[:3]
+
 
 # ------------------ 사이드바 (디자인 적용) ------------------
 with st.sidebar:
     st.header("학습 준비")
 
-    subjects = ["Python", "C", "Deep Learning", "LLM"]
+    subjects = ["Python", "C", "Deep Learning", "NLP", "Unity", "LLM", "RNN"]
+
     subject = st.selectbox(
         "주제 선택",
         subjects,
