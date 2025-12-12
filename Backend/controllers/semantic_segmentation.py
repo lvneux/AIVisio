@@ -242,7 +242,7 @@ def create_semantic_segments(transcript_data,
     print(f"🎯 목표 챕터 범위: {min_ch} ~ {max_ch}")
 
     # 4) threshold 조정 루프
-    lo_thresh = 0.55
+    lo_thresh = 0.3  # 하한선 확장: 0.55 -> 0.3으로 낮춰서 더 많은 병합 시도
     hi_thresh = 0.92
     best_result = None  # (num_segments, threshold, merged_ranges)
     best_diff = float('inf')

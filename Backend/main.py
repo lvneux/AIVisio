@@ -76,7 +76,8 @@ def main(video_id="E6DuimPZDz8", lang='en'):
         print("🔍 Semantic Segmentation을 이용한 자동 챕터 생성 시도 중...")
         
         try:
-            segments = create_semantic_segments(transcript_data, video_id, window_seconds=30)
+            # desired_min_duration을 25초로 늘려서 더 많은 병합 유도 (기본값 15.0 -> 25.0)
+            segments = create_semantic_segments(transcript_data, video_id, initial_window_seconds=30, desired_min_duration=25.0)
             
             if not segments:
                 print("❌ Semantic Segmentation으로도 챕터를 생성할 수 없습니다.")
